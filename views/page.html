@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>CoinCulture</title>
+    <!-- jquery needed for bootstrap dropdowns ... sigh -->
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script type="text/javascript" src="../assets/js/bootstrap.min.js"></script>
+    <link href="../assets/css/bootstrap.min.css" rel="stylesheet">
+  </head>
+ 
+  <body>
+    <div class="container">
+      <img src="../assets/imgs/coinculture_and_balls.png" class="img-responsive" alt="Responsive image">
+
+      <!-- load nav bar -->
+      {{template "nav.html" .}}
+
+      <div class="col-md-3">
+          <!-- load left column (recent posts) -->
+      </div>
+
+      <div class="col-md-6">
+          <h3>{{ .Title }}</h3>
+          {{ .Text }} 
+      </div>
+
+      <div class="col-md-3">
+          <!-- right column is yanlj bubbles -->
+      </div>
+
+      <!-- add footer.html -->
+ 
+    </div>
+  </body>
+</html>
