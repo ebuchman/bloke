@@ -8,17 +8,21 @@ import (
     "log"
     "io/ioutil"
     "os"
+    "path"
 )
 
-var DataPath = "../ccblog"
+// bloke should be launched from the sites root
+// should be installed in gopath/src/github/ebuchman/bloke...
+var SiteRoot = "."
+var GoPath = os.Getenv("GOPATH")
+var BlokePath = GoPath + "/src/github.com/ebuchman/bloke"
 
-//paths
-//var templates = template.Must(template.ParseFiles(Home+"views/index.html", Home+"views/config.html", Home+"views/chat.html"))
-var templates = template.Must(template.ParseFiles("./views/page.html", "./views/nav.html"))
+//parse template files
+var templates = template.Must(template.ParseFiles(BlokePath+"/views/page.html", BlokePath+"/views/nav.html"))
 
 func RenderTemplateToFile(tmpl, save_file string, p interface{}){
     //we already parsed the html templates
-    f, err := os.Create(DataPath+"sites/"+save_file+".html")
+    f, err := os.Create(SiteRoot+"/sites/"+save_file+".html")
     if err != nil{
         log.Fatal("err opening file:", err)
     }
@@ -38,47 +42,52 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
 
 
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
-        g.Title = "balls"
+        log.Println("handle Index", r.URL.Path)
         if len(r.URL.Path[1:]) > 0{
-            b, err := ioutil.ReadFile(DataPath+"/pages/"+r.URL.Path[1:]+".md")
+            b, err := ioutil.ReadFile(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
             if err != nil{
                 log.Fatal("error acessing data", err)
             }
             //g.Text = strings.Split(string(b), "\n\n")// string(b)
             g.Text = string(blackfriday.MarkdownCommon(b))
+            log.Println(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
         } else {
             g.Text = ""
         }
         g.Title = r.URL.Path[1:]
-        log.Println(g.Projects)
-        log.Println(g.SubProjects)
         renderTemplate(w, "page", g)
 }
 
 // serve static files
 func serveFile(w http.ResponseWriter, r *http.Request){
-    // if img, load from datapath
-    // if js/css, load from repo
+    // if img, load from SiteRoot
+    // if js/css, load from BlokePath
 
     if !strings.Contains(r.URL.Path, "."){
         //s.handleIndex(w, r)
     }else{
-        http.ServeFile(w, r, r.URL.Path[1:])
+        subs := strings.Split(r.URL.Path, ".")
+        ext := subs[len(subs)-1]
+        if ext == "js" || ext == "css"{
+            http.ServeFile(w, r, path.Join(BlokePath, r.URL.Path[1:]))
+        }else if ext == "png" || ext == "jpg"{
+            http.ServeFile(w, r, path.Join(SiteRoot, r.URL.Path[1:]))
+        }
     }
 }
 
 func servePage(w http.ResponseWriter, r *http.Request){
     if !strings.Contains(r.URL.Path, "."){
-        http.ServeFile(w, r, DataPath+"/sites/main.html") //+r.URL.Path[1:])
+        http.ServeFile(w, r, SiteRoot+"/sites/main.html") //+r.URL.Path[1:])
         //s.handleIndex(w, r)
     }else{
-        http.ServeFile(w, r, DataPath+"/sites/main.html") //+r.URL.Path[1:])
+        http.ServeFile(w, r, SiteRoot+"/sites/main.html") //+r.URL.Path[1:])
     }
 }
 
 func (g *Globals) AssembleSite(){
     // go through pages and posts and entries
-    files, err := ioutil.ReadDir(DataPath+"/pages")
+    files, err := ioutil.ReadDir(SiteRoot+"/pages")
     if err != nil {
         log.Fatal("error reading pages")
     }
@@ -89,7 +98,7 @@ func (g *Globals) AssembleSite(){
             g.Projects = append(g.Projects, name)
             g.SubProjects[name] = []string{}
         } else{
-            subfiles, err := ioutil.ReadDir(DataPath+"/pages/"+f.Name())
+            subfiles, err := ioutil.ReadDir(SiteRoot+"/pages/"+f.Name())
             if err != nil {
                 log.Fatal("error reading sub pages")
             }
@@ -118,6 +127,7 @@ type Globals struct{
 }
 
 func StartServer(){
+
     g := Globals{}
 
     g.AssembleSite()
@@ -125,6 +135,7 @@ func StartServer(){
     // pages
     http.HandleFunc("/", g.handleIndex) // main page
     //http.HandleFunc("/", servePage) // main page
+    http.HandleFunc("/imgs/", serveFile)
     http.HandleFunc("/assets/", serveFile) // static files
 
     // sockets
