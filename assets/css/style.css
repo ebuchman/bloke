@@ -1,0 +1,82 @@
+
+body
+{
+ overflow-y:scroll;
+}
+
+
+#workflow
+{
+ margin:0 auto;
+ margin-top:50px;
+ width:600px;
+}
+
+#search
+{
+ width:250px;
+ resize:both;
+ overflow:auto;
+}
+
+#search_box
+{
+ margin:5px;
+ width:200px;
+}
+
+.content_unit
+{
+ border-style:solid;
+ border-width:5px;
+ border-color:#808090 ;
+ border-radius: 10px; 
+ box-shadow: 0px 1px 2px #555;
+}
+
+
+#recent_posts
+{
+ margin-top:20px;
+ width: 250px;
+
+ resize:both;
+ overflow:auto;
+}
+
+.post
+{
+ margin:20px;
+}
+
+
+.entry{
+ margin: 20px;
+}
+
+
+#entry_div_box_proto
+{
+ display:none;
+}
+
+.entry_div_box
+{
+ margin-top:20px;
+ position:relative;
+ resize:both;
+ overflow:auto;
+}
+
+#logout_button
+{
+ position:fixed; 
+ top:20px;
+ right:100px;
+}
+
+.x_button
+{
+ float:right;
+}
+

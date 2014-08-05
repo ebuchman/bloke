@@ -1,7 +1,7 @@
 package main
 
 import (
-    "github.com/russross/blackfriday"
+    "github.com/russross/blackfriday" // parsing markdown
     "net/http"
     "text/template"
     "strings"
@@ -9,6 +9,8 @@ import (
     "io/ioutil"
     "os"
     "path"
+    "regexp"
+    "fmt"
 )
 
 // bloke should be launched from the sites root
@@ -18,7 +20,7 @@ var GoPath = os.Getenv("GOPATH")
 var BlokePath = GoPath + "/src/github.com/ebuchman/bloke"
 
 //parse template files
-var templates = template.Must(template.ParseFiles(BlokePath+"/views/page.html", BlokePath+"/views/nav.html"))
+var templates = template.Must(template.ParseFiles(BlokePath+"/views/page.html", BlokePath+"/views/nav.html", BlokePath+"/views/footer.html", BlokePath+"/views/bubbles.html"))
 
 func RenderTemplateToFile(tmpl, save_file string, p interface{}){
     //we already parsed the html templates
@@ -40,25 +42,82 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
     }
 }
 
+// get name from blogpost url
+func GetNameFromPost(s string) string{
+       date_name := strings.Split(strings.Split(s, ".")[0], "-")
+       title := date_name[3]
+       return title
+}
+
+// parse and replace for bubbles and markdown to js/html
+// takes the raw txt.md bytes
+func DataTransform(s []byte) string{
+    r, _ := regexp.Compile(`\[\[(.+?)\] \[(.+?)\]\]?`)
+    s = blackfriday.MarkdownCommon(s)
+    return r.ReplaceAllString(string(s), `<a href="#/" onClick="get_entry_data('$2')">$1</a>`)
+}
 
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         log.Println("handle Index", r.URL.Path)
+        /* url is either
+            /
+            /posts/Date-PostName
+            /ProjectName
+        */ 
         if len(r.URL.Path[1:]) > 0{
-            b, err := ioutil.ReadFile(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
-            if err != nil{
-                log.Fatal("error acessing data", err)
+            path_elements := strings.Split(r.URL.Path[1:], "/")
+            log.Println(path_elements)
+            // posts
+            if path_elements[0] == "posts"{
+                b, err := ioutil.ReadFile(path.Join(SiteRoot,r.URL.Path[1:]))
+                if err != nil{
+                    log.Fatal("error acessing data", err)
+                }
+                g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
+                g.Title = GetNameFromPost(r.URL.Path[1:])
+            // pages
+            }else{
+                b, err := ioutil.ReadFile(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
+                if err != nil{
+                    log.Fatal("error acessing data", err)
+                }
+                g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
+                log.Println(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
+                split_path := strings.Split(r.URL.Path[1:], "/")
+                g.Title = split_path[len(split_path)-1]
             }
-            //g.Text = strings.Split(string(b), "\n\n")// string(b)
-            g.Text = string(blackfriday.MarkdownCommon(b))
-            log.Println(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
+        // home
         } else {
-            g.Text = ""
+            b, err := ioutil.ReadFile(SiteRoot+"/posts/"+g.RecentPosts[0][1])
+            if err != nil{
+                log.Fatal("error opening post", err)
+            }
+            g.Text = string(blackfriday.MarkdownCommon(b))
+            g.Title = g.RecentPosts[0][0]
         }
-        g.Title = r.URL.Path[1:]
         renderTemplate(w, "page", g)
 }
 
-// serve static files
+
+// ajax bubble response
+func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
+    path_split := strings.Split(r.URL.Path[1:], "/")
+    // path_split [0] should be bubble
+    bubble := path_split[1]
+    b, err := ioutil.ReadFile(path.Join(SiteRoot, r.URL.Path[1:]))
+    if err != nil{
+        log.Fatal("error on bubble", r.URL.Path[1:], err)
+    }
+    g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
+    g.Title = bubble
+
+    // return json
+    fmt.Fprintf(w, DataTransform(b))
+
+
+}
+
+// serve static files (assets)
 func serveFile(w http.ResponseWriter, r *http.Request){
     // if img, load from SiteRoot
     // if js/css, load from BlokePath
@@ -85,8 +144,8 @@ func servePage(w http.ResponseWriter, r *http.Request){
     }
 }
 
-func (g *Globals) AssembleSite(){
-    // go through pages and posts and entries
+
+func (g *Globals) AssemblePages(){
     files, err := ioutil.ReadDir(SiteRoot+"/pages")
     if err != nil {
         log.Fatal("error reading pages")
@@ -111,19 +170,56 @@ func (g *Globals) AssembleSite(){
             g.SubProjects[f.Name()] = list
         }
     }
+}
+
+func (g *Globals) AssemblePosts(){
+    // posts dir should be fill with files like 2014-06-12-Name.md
+    // No directories
+    files, err := ioutil.ReadDir(SiteRoot+"/posts")
+    if err != nil {
+        log.Fatal("error reading pages")
+    }
+    for _, f := range files {
+        if !f.IsDir(){
+           date_name := strings.Split(strings.Split(f.Name(), ".")[0], "-")
+           //year := date_name[0]
+           //month := date_name[1]
+           //day := date_name[2]
+           title := date_name[3]
+           g.RecentPosts = append(g.RecentPosts, []string{title, f.Name()})
+        }
+    }
+
+}
+
+
+
+func (g *Globals) AssembleSite(){
+    // go through pages and posts and entries
     //RenderTemplateToFile("page", "main", g)
+    g.AssemblePages()
+    g.AssemblePosts()
     g.NumProjects = len(g.Projects)
     log.Println(g)
 
 
 }
 
+type Bubble struct{
+    Title string
+    Text string
+}
+
 type Globals struct{
     NumProjects int
     Projects []string // names of projects
     SubProjects map[string][]string // subprojects are either list of strings or empty. these generate the dropdowns
+    Posts map[string]map[string]map[string][]string // year, month, day, title
+    RecentPosts [][]string // [](title, date_name)
     Text string
     Title string
+
+    Bubbles []Bubble
 }
 
 func StartServer(){
@@ -137,6 +233,7 @@ func StartServer(){
     //http.HandleFunc("/", servePage) // main page
     http.HandleFunc("/imgs/", serveFile)
     http.HandleFunc("/assets/", serveFile) // static files
+    http.HandleFunc("/bubbles/", g.ajaxResponse) // async bubbles
 
     // sockets
     //http.Handle("/chat_sock", websocket.Handler(g.chatSocketHandler))

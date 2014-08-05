@@ -2,34 +2,48 @@
 <html>
   <head>
     <title>CoinCulture</title>
-    <!-- jquery needed for bootstrap dropdowns ... sigh -->
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
-    <script type="text/javascript" src="/assets/js/bootstrap.min.js"></script>
     <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/assets/css/style.css" rel="stylesheet">
   </head>
  
   <body>
     <div class="container">
-        <img src="/imgs/coinculture_and_balls.png" class="img-responsive" alt="Responsive image">
-
+      <img src="/imgs/coinculture_and_balls.png" class="img-responsive" alt="Responsive image">
       <!-- load nav bar -->
       {{template "nav.html" .}}
 
+
+      <!-- left column (recent posts) -->
       <div class="col-md-3">
-          <!-- load left column (recent posts) -->
+          <h5>Recent Posts</h5>
+          <ul>
+              {{range $i, $n := .RecentPosts}}
+              <li><a href="posts/{{index $n 1}}">{{index $n 0}}</a></li>
+              {{ end }}
+          </ul>
       </div>
 
+      <!-- center column (main text) -->
       <div class="col-md-6">
           <h3>{{ .Title }}</h3>
           {{ .Text }} 
       </div>
 
+      <!-- right column (bubbles) -->
       <div class="col-md-3">
-          <!-- right column is yanlj bubbles -->
+        <div id="workflow">
+          {{template "bubbles.html" .}}
+        </div>
       </div>
-
-      <!-- add footer.html -->
- 
     </div>
+
+    {{template "footer.html" .}}
+ 
   </body>
+    <!--load js at end because page loads faster
+        jquery needed for bootstrap dropdowns ... 
+        I should probably just learn jquery-->
+    <script src="/assets/js/jquery-1.11.1.min.js"></script>
+    <script type="text/javascript" src="/assets/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="/assets/js/wiki.js?a=271"></script>
 </html>
