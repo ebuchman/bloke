@@ -16,7 +16,6 @@ import (
 )
 
 /* TODO
-    - replace log.fatal with error page
     - ensure access is properly restricted
     - make sure bubble entries exist before replacing [[] []] with link
     - watch github repo and update
@@ -88,7 +87,10 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             if path_elements[0] == "posts"{
                 b, err := ioutil.ReadFile(path.Join(SiteRoot,r.URL.Path[1:]))
                 if err != nil{
-                    log.Fatal("error acessing data", err)
+                    g.Title = "Error"
+                    g.Text = err.Error()
+                    renderTemplate(w, "page", g)
+                    return 
                 }
                 g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
                 g.Title = GetNameFromPost(r.URL.Path[1:])
@@ -96,7 +98,10 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }else{
                 b, err := ioutil.ReadFile(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
                 if err != nil{
-                    log.Fatal("error acessing data", err)
+                    g.Title = "Error"
+                    g.Text = err.Error()
+                    renderTemplate(w, "page", g)
+                    return 
                 }
                 g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
                 log.Println(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
@@ -107,7 +112,10 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         } else {
             b, err := ioutil.ReadFile(SiteRoot+"/posts/"+g.RecentPosts[0][1])
             if err != nil{
-                log.Fatal("error opening post", err)
+                g.Title = "Error"
+                g.Text = err.Error()
+                renderTemplate(w, "page", g)
+                return 
             }
             g.Text = string(blackfriday.MarkdownCommon(b))
             g.Title = g.RecentPosts[0][0]
@@ -123,7 +131,7 @@ func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
     //bubble := path_split[1]
     b, err := ioutil.ReadFile(path.Join(SiteRoot, r.URL.Path[1:]))
     if err != nil{
-        log.Fatal("error on bubble ", r.URL.Path[1:], err)
+        log.Println("error on bubble ", r.URL.Path[1:], err)
     }
     fmt.Fprintf(w, DataTransform(b))
 }
