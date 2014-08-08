@@ -11,13 +11,29 @@ import (
     "path"
     "regexp"
     "fmt"
+    "encoding/json"
+    "flag"
 )
+
+/* TODO
+    - replace log.fatal with error page
+    - ensure access is properly restricted
+    - make sure bubble entries exist before replacing [[] []] with link
+    - watch github repo and update
+    - robustify posts functionality
+    - clean up js bubbles so they follow user as they scroll
+
+*/
 
 // bloke should be launched from the sites root
 // should be installed in gopath/src/github/ebuchman/bloke...
 var SiteRoot = "."
 var GoPath = os.Getenv("GOPATH")
-var BlokePath = GoPath + "/src/github.com/ebuchman/bloke"
+var BlokePath = GoPath + "/src/github.com/ebuchman/bloke" // is there a nicer way to get this?
+
+var InitSite = flag.String("init", "", "path to new site dir")
+
+
 
 //parse template files
 var templates = template.Must(template.ParseFiles(BlokePath+"/views/page.html", BlokePath+"/views/nav.html", BlokePath+"/views/footer.html", BlokePath+"/views/bubbles.html"))
@@ -57,12 +73,13 @@ func DataTransform(s []byte) string{
     return r.ReplaceAllString(string(s), `<a href="#/" onClick="get_entry_data('$2')">$1</a>`)
 }
 
+// main routing function
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         log.Println("handle Index", r.URL.Path)
         /* url is either
-            /
-            /posts/Date-PostName
-            /ProjectName
+            /                                   home page (recent blog posts)  
+            /posts/Date-PostName                a specific blog post
+            /ProjectName                        a particular project page
         */ 
         if len(r.URL.Path[1:]) > 0{
             path_elements := strings.Split(r.URL.Path[1:], "/")
@@ -101,20 +118,14 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
 
 // ajax bubble response
 func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
-    path_split := strings.Split(r.URL.Path[1:], "/")
-    // path_split [0] should be bubble
-    bubble := path_split[1]
+    //path_split := strings.Split(r.URL.Path[1:], "/")
+    // path_split [0] should be "bubble"
+    //bubble := path_split[1]
     b, err := ioutil.ReadFile(path.Join(SiteRoot, r.URL.Path[1:]))
     if err != nil{
-        log.Fatal("error on bubble", r.URL.Path[1:], err)
+        log.Fatal("error on bubble ", r.URL.Path[1:], err)
     }
-    g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
-    g.Title = bubble
-
-    // return json
     fmt.Fprintf(w, DataTransform(b))
-
-
 }
 
 // serve static files (assets)
@@ -135,6 +146,7 @@ func serveFile(w http.ResponseWriter, r *http.Request){
     }
 }
 
+// serve a single html page
 func servePage(w http.ResponseWriter, r *http.Request){
     if !strings.Contains(r.URL.Path, "."){
         http.ServeFile(w, r, SiteRoot+"/sites/main.html") //+r.URL.Path[1:])
@@ -144,7 +156,8 @@ func servePage(w http.ResponseWriter, r *http.Request){
     }
 }
 
-
+// compile list of pages and prepare Globals struct (mostly for filling in the nav bar with pages links)
+// in future, write everything out to static .html files for serving later (so we don't have to render template each time)
 func (g *Globals) AssemblePages(){
     files, err := ioutil.ReadDir(SiteRoot+"/pages")
     if err != nil {
@@ -172,6 +185,7 @@ func (g *Globals) AssemblePages(){
     }
 }
 
+// compile list of posts and fill in Globals struct
 func (g *Globals) AssemblePosts(){
     // posts dir should be fill with files like 2014-06-12-Name.md
     // No directories
@@ -192,26 +206,24 @@ func (g *Globals) AssemblePosts(){
 
 }
 
-
-
+// main server startup function
+// compile lists of pages and posts and prepare globals struct
 func (g *Globals) AssembleSite(){
     // go through pages and posts and entries
     //RenderTemplateToFile("page", "main", g)
     g.AssemblePages()
     g.AssemblePosts()
-    g.NumProjects = len(g.Projects)
+    //g.NumProjects = len(g.Projects)
     log.Println(g)
-
-
 }
 
-type Bubble struct{
-    Title string
-    Text string
+type ConfigType struct{
+    SiteName string `json:"site_name"`
+    Email string `json:"email"`
+    Site string `json:"site"`
 }
 
 type Globals struct{
-    NumProjects int
     Projects []string // names of projects
     SubProjects map[string][]string // subprojects are either list of strings or empty. these generate the dropdowns
     Posts map[string]map[string]map[string][]string // year, month, day, title
@@ -219,25 +231,68 @@ type Globals struct{
     Text string
     Title string
 
-    Bubbles []Bubble
+    Config ConfigType
+}
+
+func (g * Globals) LoadConfig(){
+    file, e := ioutil.ReadFile(path.Join(SiteRoot, "config.json"))
+    if e != nil{
+        log.Fatal("no config", e)
+    }
+    log.Println("file", string(file))
+    var c ConfigType
+    json.Unmarshal(file, &c)
+    log.Println(c)
+    g.Config = c
+    log.Println("config", g.Config)
+}
+
+func CreateNewSite(){
+    os.Mkdir(*InitSite, 0777) // apparently 6s aren't sufficient here?
+    os.Mkdir(path.Join(*InitSite, "bubbles"), 0666)
+    os.MkdirAll(path.Join(*InitSite, "imgs"), 0666)
+    os.MkdirAll(path.Join(*InitSite, "pages"), 0666)
+    os.MkdirAll(path.Join(*InitSite, "posts"), 0666)
+
+    f, err := os.Create(path.Join(*InitSite, "config.json"))
+    defer f.Close()
+    if err != nil{
+     log.Println("Could not create config file:", err)
+    }else{
+        /*
+        c := ConfigType{SiteName: *InitSite}
+        jc, _ := json.Marshal(c)
+        enc := json.NewEncoder(f)
+        err := enc.Encode(jc)
+        if err != nil{
+            log.Fatal(err)
+        }
+        */ // why can't I write a clean config file?
+        f.WriteString("{\n")
+        f.WriteString("\t\"site_name\": \""+*InitSite+"\",\n")
+        f.WriteString("\t\"email\": \"\",\n")
+        f.WriteString("\t\"site\": \"\"\n")
+        f.WriteString("}")
+
+    }
 }
 
 func StartServer(){
+    flag.Parse()
+    
+    if *InitSite != ""{
+        CreateNewSite()
+        os.Exit(0)
+    }
 
     g := Globals{}
-
+    g.LoadConfig()
     g.AssembleSite()
 
-    // pages
     http.HandleFunc("/", g.handleIndex) // main page
-    //http.HandleFunc("/", servePage) // main page
     http.HandleFunc("/imgs/", serveFile)
     http.HandleFunc("/assets/", serveFile) // static files
     http.HandleFunc("/bubbles/", g.ajaxResponse) // async bubbles
-
-    // sockets
-    //http.Handle("/chat_sock", websocket.Handler(g.chatSocketHandler))
-    //http.Handle("/ethereum", websocket.Handler(g.ethereumSocketHandler))
 
     http.ListenAndServe(":9099", nil)
 }
