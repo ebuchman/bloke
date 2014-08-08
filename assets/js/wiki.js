@@ -34,10 +34,13 @@ function make_request(xmlhttp, method, path, async, params){
 
 // inplace is either nothing or is the element corresponding to the bubble to change
 function get_entry_data(name, inplace){
-    inplace = typeof inplace !== 'undefined' ? inplace : 0
+    inplace = typeof inplace !== 'undefined' ? inplace : 0;
+
+    console.log(document.documentElement.scrollTop);
+    console.log(document.body.scrollTop);
 
     xmlhttp = new_request_obj();
-    request_callback(xmlhttp, _get_entry_data, [name, inplace]);
+    request_callback(xmlhttp, _get_entry_data, [name, inplace, document.documentElement.scrollTop]);
     make_request(xmlhttp, "POST", "/bubbles/"+name+".md", true, {"form":"load_content", "name":name});
     return false;
 }
@@ -60,7 +63,7 @@ function displaySearchResults(keystrokes){
 
 // bubble functions
 
-function new_bubble(name, content){
+function new_bubble(name, content, pos){
     var workflow_div = document.getElementById('workflow');
     var proto = document.getElementById('entry_div_box_proto').cloneNode(true);
 
@@ -71,6 +74,7 @@ function new_bubble(name, content){
     proto.getElementsByClassName('content_header')[0].innerHTML = "<h4>"+name+"</h4>";
     proto.setAttribute("class", "entry_div_box content_unit");
     proto.setAttribute("id", "entry_div_box_"+name);
+    //proto.setAttribute("style", "position:absolute;margin-top:"+pos.toString()+"px;");
 
     workflow_div.insertBefore(proto, workflow_div.children[1]);
 }
@@ -87,9 +91,9 @@ function close_bubble(id){
 
 // callback
 
-function _get_entry_data(xmlhttp, name, inplace){
+function _get_entry_data(xmlhttp, name, inplace, pos){
 	var content = xmlhttp.responseText; //JSON.parse(xmlhttp.responseText);
-    new_bubble(name, content);
+    new_bubble(name, content, pos);
 }
 
 

@@ -13,14 +13,20 @@ import (
     "fmt"
     "encoding/json"
     "flag"
+    "os/exec"
+    "bytes"
+    "time"
 )
 
 /* TODO
     - ensure access is properly restricted
     - make sure bubble entries exist before replacing [[] []] with link
+        - if not, add text "this bubble does not exist, make it on github..."
     - watch github repo and update
     - robustify posts functionality
     - clean up js bubbles so they follow user as they scroll
+    - meta info (pages, posts, bubbles)
+    - add "technical explanation" part to bubbles
 
 */
 
@@ -31,8 +37,6 @@ var GoPath = os.Getenv("GOPATH")
 var BlokePath = GoPath + "/src/github.com/ebuchman/bloke" // is there a nicer way to get this?
 
 var InitSite = flag.String("init", "", "path to new site dir")
-
-
 
 //parse template files
 var templates = template.Must(template.ParseFiles(BlokePath+"/views/page.html", BlokePath+"/views/nav.html", BlokePath+"/views/footer.html", BlokePath+"/views/bubbles.html"))
@@ -72,6 +76,13 @@ func DataTransform(s []byte) string{
     return r.ReplaceAllString(string(s), `<a href="#/" onClick="get_entry_data('$2')">$1</a>`)
 }
 
+// error function
+func (g *Globals) errorPage(w http.ResponseWriter, err error){
+    g.Title = "Error"
+    g.Text = err.Error()
+    renderTemplate(w, "page", g)
+}
+
 // main routing function
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         log.Println("handle Index", r.URL.Path)
@@ -87,9 +98,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             if path_elements[0] == "posts"{
                 b, err := ioutil.ReadFile(path.Join(SiteRoot,r.URL.Path[1:]))
                 if err != nil{
-                    g.Title = "Error"
-                    g.Text = err.Error()
-                    renderTemplate(w, "page", g)
+                    g.errorPage(w, err)
                     return 
                 }
                 g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
@@ -98,9 +107,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }else{
                 b, err := ioutil.ReadFile(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
                 if err != nil{
-                    g.Title = "Error"
-                    g.Text = err.Error()
-                    renderTemplate(w, "page", g)
+                    g.errorPage(w, err)
                     return 
                 }
                 g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
@@ -112,9 +119,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         } else {
             b, err := ioutil.ReadFile(SiteRoot+"/posts/"+g.RecentPosts[0][1])
             if err != nil{
-                g.Title = "Error"
-                g.Text = err.Error()
-                renderTemplate(w, "page", g)
+                g.errorPage(w, err)
                 return 
             }
             g.Text = string(blackfriday.MarkdownCommon(b))
@@ -171,6 +176,7 @@ func (g *Globals) AssemblePages(){
     if err != nil {
         log.Fatal("error reading pages")
     }
+    log.Println(files)
     g.SubProjects = make(map[string][]string)
     for _, f := range files {
         if !f.IsDir(){
@@ -247,12 +253,9 @@ func (g * Globals) LoadConfig(){
     if e != nil{
         log.Fatal("no config", e)
     }
-    log.Println("file", string(file))
     var c ConfigType
     json.Unmarshal(file, &c)
-    log.Println(c)
     g.Config = c
-    log.Println("config", g.Config)
 }
 
 func CreateNewSite(){
@@ -280,24 +283,50 @@ func CreateNewSite(){
         f.WriteString("\t\"site_name\": \""+*InitSite+"\",\n")
         f.WriteString("\t\"email\": \"\",\n")
         f.WriteString("\t\"site\": \"\"\n")
+        f.WriteString("\t\"github_repo\": \"\"\n")
         f.WriteString("}")
+    }
+    log.Println("Please configure your site by editing config.json. Then, run bloke")
+}
 
+// every minute, try git pull
+func (g *Globals) MonitorRepo(){
+    for {
+        time.Sleep(time.Minute)
+        g.GitPull()
     }
 }
 
-func StartServer(){
-    flag.Parse()
-    
-    if *InitSite != ""{
-        CreateNewSite()
-        os.Exit(0)
-    }
+// if git pull not up to date, refresh Globals
+func (g *Globals) GitPull(){
+     cmd := exec.Command("git", "pull", "origin", "master")
+     var out bytes.Buffer
+     cmd.Stdout = &out
+     cmd.Run()
+     log.Println(out.String())
+     if !strings.Contains(out.String(), "already up-to-date"){
+        g.Refresh()
+     }
+}
 
+// create new globals, copy over
+func (g *Globals) Refresh(){
+    gg := Globals{}
+    gg.LoadConfig()
+    gg.AssembleSite()
+    *g = gg
+}
+
+
+func StartServer(){
     g := Globals{}
     g.LoadConfig()
     g.AssembleSite()
 
-    http.HandleFunc("/", g.handleIndex) // main page
+    // monitor site repo for any new changes
+    go g.MonitorRepo()
+
+    http.HandleFunc("/", g.handleIndex) // main page (/, /posts, /pages)
     http.HandleFunc("/imgs/", serveFile)
     http.HandleFunc("/assets/", serveFile) // static files
     http.HandleFunc("/bubbles/", g.ajaxResponse) // async bubbles
@@ -306,5 +335,12 @@ func StartServer(){
 }
 
 func main(){
+    flag.Parse()
+    
+    if *InitSite != ""{
+        CreateNewSite()
+        os.Exit(0)
+    }
+  
     StartServer()
 }
