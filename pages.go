@@ -7,6 +7,7 @@ import (
     "log"
     "os"
     "regexp"
+    "path"
 )
 
 
@@ -31,13 +32,27 @@ func (g *Globals) errorPage(w http.ResponseWriter, err error){
 
 // parse and replace for bubbles and markdown to js/html
 // takes the raw txt.md bytes
-func DataTransform(s []byte) string{
+// creates new bubble entries if they are referenced but don't exist
+func (g *Globals) ParseBubbles(s []byte) string{
     r, _ := regexp.Compile(`\[\[(.+?)\] \[(.+?)\]\]?`)
     s = blackfriday.MarkdownCommon(s)
+
+    // get all matches, check if they exist, add them if not...
+    for _, match := range r.FindAllStringSubmatch(string(s), -1){
+        name := match[2]
+        _, err := os.Stat(path.Join("bubbles", name+".md"))
+        if err != nil{
+            f, err := os.Create(path.Join("bubbles", name+".md"))
+            if err != nil{
+                log.Println("could not create new bubble file")
+            } else{
+                f.WriteString("This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo!]("+g.Config.Repo+")")
+            }
+        }
+    }
+
     return r.ReplaceAllString(string(s), `<a href="#/" onClick="get_entry_data('$2')">$1</a>`)
 }
-
-
 
 
 

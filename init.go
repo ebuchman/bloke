@@ -107,6 +107,7 @@ func CreateNewSite(){
     os.Mkdir(*InitSite, 0777) // apparently 6s aren't sufficient here?
     os.Mkdir(path.Join(*InitSite, "bubbles"), 0666)
     os.MkdirAll(path.Join(*InitSite, "imgs"), 0666)
+    os.MkdirAll(path.Join(*InitSite, "files"), 0666)
     os.MkdirAll(path.Join(*InitSite, "pages"), 0666)
     os.MkdirAll(path.Join(*InitSite, "posts"), 0666)
 
