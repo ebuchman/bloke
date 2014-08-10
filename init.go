@@ -5,10 +5,12 @@ import (
     "log"
     "io/ioutil"
     "os"
+    "os/exec"
     "path"
     "encoding/json"
     "encoding/hex"
     "crypto/rand"
+    "bytes"
 )
 
 // load config struct from config.json
@@ -20,6 +22,38 @@ func (g * Globals) LoadConfig(){
     var c ConfigType
     json.Unmarshal(file, &c)
     g.Config = c
+
+    if g.Config.Repo != ""{
+        log.Println("Iniitializing git repo and syncing with github remote...")
+        // initialize as git repo
+        cmd := exec.Command("git", "init")
+        cmd.Run()
+
+        // check remote host
+        cmd = exec.Command("git", "remote", "--v")
+        var out bytes.Buffer
+        cmd.Stdout = &out
+        cmd.Run()
+        if !strings.Contains(out.String(), g.Config.Repo){
+            cmd = exec.Command("git", "remote", "add", "origin", g.Config.Repo)
+            cmd.Run()
+        }
+       
+        // check if empty commit history, add files, commit, and push to remote
+        cmd = exec.Command("git", "status")
+        out = *new(bytes.Buffer)
+        cmd.Stdout = &out
+        cmd.Run()
+        if strings.Contains(out.String(), "Initial commit"){
+            log.Println("making inital git commit and pushing to remote. you may need to authenticate!")
+            cmd = exec.Command("git", "add", "pages", "posts", "bubbles", "config.json")
+            cmd.Run()
+            cmd = exec.Command("git", "commit", "-m", `"init"`)
+            cmd.Run()
+            cmd = exec.Command("git", "push", "origin", "master")
+            cmd.Run()
+        }
+    }
 }
 
 func (g *Globals) LoadSecret(){
@@ -128,11 +162,12 @@ func CreateNewSite(){
         f.WriteString("{\n")
         f.WriteString("\t\"site_name\": \""+*InitSite+"\",\n")
         f.WriteString("\t\"email\": \"\",\n")
-        f.WriteString("\t\"site\": \"\"\n")
+        f.WriteString("\t\"site\": \"\",\n")
         f.WriteString("\t\"github_repo\": \"\"\n")
         f.WriteString("}")
     }
-    log.Println("Please configure your site by editing config.json. Then, run bloke")
+    log.Println("Your site has been created!")
+    log.Println("To configure your site, please edit config.json. Then, run bloke")
 }
 
 func CreateSecretToken(){
