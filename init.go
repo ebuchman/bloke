@@ -52,6 +52,8 @@ func (g * Globals) LoadConfig(){
             cmd.Run()
             cmd = exec.Command("git", "push", "origin", "master")
             cmd.Run()
+        } else {
+            log.Println("\tnothing to do")
         }
     }
 }
@@ -73,7 +75,6 @@ func (g *Globals) AssembleSite(){
     //RenderTemplateToFile("page", "main", g)
     g.AssemblePages()
     g.AssemblePosts()
-    //g.NumProjects = len(g.Projects)
     g.LoadSecret()
     log.Println(g)
 }
@@ -88,12 +89,13 @@ func (g *Globals) AssemblePosts(){
     }
     for _, f := range files {
         if !f.IsDir(){
-           date_name := strings.Split(strings.Split(f.Name(), ".")[0], "-")
+           fname := strings.Split(f.Name(), ".")[0]
+           date_name := strings.Split(fname, "-")
            //year := date_name[0]
            //month := date_name[1]
            //day := date_name[2]
            title := date_name[3]
-           g.RecentPosts = append(g.RecentPosts, []string{title, f.Name()})
+           g.RecentPosts = append(g.RecentPosts, []string{title, fname})
         }
     }
 
@@ -129,11 +131,14 @@ func (g *Globals) AssemblePages(){
     }
 }
 
-// get name from blogpost url
-func GetNameFromPost(s string) string{
-       date_name := strings.Split(strings.Split(s, ".")[0], "-")
-       title := date_name[3]
-       return title
+// get name from url
+func GetTitleFromUrl(s string) string{
+       split_path := strings.Split(s, "/")
+       if IsPost(split_path[0]){
+           date_name := strings.Split(strings.Split(s, ".")[0], "-")
+           return date_name[3]
+       }
+       return split_path[len(split_path)-1]
 }
 
 // called on `bloke --init _InitSite`

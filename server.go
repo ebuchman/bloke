@@ -15,15 +15,15 @@ import (
     "encoding/hex"
     "crypto/hmac"
     "crypto/sha1"
+    "errors"
 )
 
 /* TODO
-    - ensure access is properly restricted
     - add tls support
     - clean up js bubbles so they follow user as they scroll
     - meta info (pages, posts, bubbles)
     - add "technical explanation" part to bubbles
-    - robustify posts functionality
+    - validate serve assets
 */
 
 // bloke should be launched from the sites root
@@ -45,6 +45,10 @@ type ConfigType struct{
     Repo string `json:"github_repo"`
 }
 
+type MetaInfoType struct {
+    Title string `json:"title"`
+}
+
 // main site struct
 type Globals struct{
     Projects []string // names of projects
@@ -54,52 +58,56 @@ type Globals struct{
 
     Text string // text of current page
     Title string // title of current page
+    MetaInfo MetaInfoType // struct of meta info
 
     Config ConfigType
 
     webhookSecret []byte // secret key for authenticating github webhook requests
 }
 
-/* main routing function
-    url is either
-        /                                   home page (recent blog posts)  
-        /posts/Date-PostName                a specific blog post
-        /ProjectName                        a particular project page
+/* 
+    main routing function - validate, render, server pages
+        url is either
+            /                                   home page (recent blog posts)  
+            /Date-PostName                      a specific blog post
+            /ProjectName                        a particular project page
+            /ProjectName/SubProjectName         a particular subproject page
 */ 
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         log.Println("handle Index", r.URL.Path)
+        // is URL is empty, serve main page, else validate URL and LoadPage
         if len(r.URL.Path[1:]) > 0{
             path_elements := strings.Split(r.URL.Path[1:], "/")
-            // posts
-            if path_elements[0] == "posts"{
-                b, err := ioutil.ReadFile(path.Join(SiteRoot,r.URL.Path[1:]))
-                if err != nil{
-                    g.errorPage(w, err)
-                    return 
-                }
-                g.Text = g.ParseBubbles(b) 
-                g.Title = GetNameFromPost(r.URL.Path[1:])
-            // pages
-            }else{
-                b, err := ioutil.ReadFile(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
-                if err != nil{
-                    g.errorPage(w, err)
-                    return 
-                }
-                g.Text = g.ParseBubbles(b) 
-                log.Println(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
-                split_path := strings.Split(r.URL.Path[1:], "/")
-                g.Title = split_path[len(split_path)-1]
+            // currently, a URL can only have 2 parts (ie. if its a subproject)
+            if len(path_elements) > 2{
+                g.errorPage(w, errors.New("Invalid URL"))
+                return
             }
-        // home
+            //posts
+            if IsPost(path_elements[0]){
+                err := g.LoadPage(path.Join(SiteRoot, "posts"), r.URL.Path[1:])
+                if err != nil{
+                    g.errorPage(w, err)
+                    return
+                }
+            //pages
+            }else if g.IsPage(r.URL.Path[1:]){
+                err := g.LoadPage(path.Join(SiteRoot, "pages"), r.URL.Path[1:])
+                if err != nil{
+                    g.errorPage(w, err)
+                    return 
+                }
+            } else{
+                g.errorPage(w, errors.New("Invalid URL"))
+                return
+            }
+        //home
         } else {
-            b, err := ioutil.ReadFile(SiteRoot+"/posts/"+g.RecentPosts[0][1])
+            err := g.LoadPage(path.Join(SiteRoot, "posts"), g.RecentPosts[0][1])
             if err != nil{
                 g.errorPage(w, err)
                 return 
             }
-            g.Text = g.ParseBubbles(b) 
-            g.Title = g.RecentPosts[0][0]
         }
         renderTemplate(w, "page", g)
 }
@@ -191,6 +199,8 @@ func (g *Globals) Refresh(){
 func serveFile(w http.ResponseWriter, r *http.Request){
     // if img, load from SiteRoot
     // if js/css, load from BlokePath
+
+    //TODO: better validation
 
     if !strings.Contains(r.URL.Path, "."){
         //s.handleIndex(w, r)
