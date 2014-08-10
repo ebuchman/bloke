@@ -19,8 +19,6 @@ import (
 )
 
 /* TODO
-    - parse for images, pdfs, 
-    - github webhook
     - ensure access is properly restricted
     - make sure bubble entries exist before replacing [[] []] with link
         - if not, add text "this bubble does not exist, make it on github...", create .md file
@@ -39,6 +37,7 @@ var BlokePath = GoPath + "/src/github.com/ebuchman/bloke" // is there a nicer wa
 
 var InitSite = flag.String("init", "", "path to new site dir")
 var ListenPort = flag.Int("port", 9099, "port to listen for incoming connections")
+var WebHook = flag.Bool("webhook", false, "create a new secret token for use with github webhook")
 
 type ConfigType struct{
     SiteName string `json:"site_name"`
@@ -55,6 +54,8 @@ type Globals struct{
     Title string
 
     Config ConfigType
+
+    webhookSecret []byte
 }
 
 // main routing function
@@ -141,7 +142,8 @@ func (g *Globals) gitResponse(w http.ResponseWriter, r *http.Request){
         return
     }
 
-    key := []byte(os.Getenv("SECRET_TOKEN"))
+//    key := []byte(os.Getenv("SECRET_TOKEN"))
+    key := g.webhookSecret
     sigbytes, err := hex.DecodeString(sig[5:])
     if err != nil{
         log.Println("no hex to bytes!", err)
@@ -235,5 +237,10 @@ func main(){
         os.Exit(0)
     }
   
+    if *WebHook{
+        CreateSecretToken()
+        os.Exit(0)
+    }
+
     StartServer()
 }

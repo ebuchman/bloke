@@ -7,6 +7,8 @@ import (
     "os"
     "path"
     "encoding/json"
+    "encoding/hex"
+    "crypto/rand"
 )
 
 // load config struct from config.json
@@ -20,6 +22,16 @@ func (g * Globals) LoadConfig(){
     g.Config = c
 }
 
+func (g *Globals) LoadSecret(){
+    file, e := ioutil.ReadFile(path.Join(SiteRoot, ".secret"))
+    if e != nil{
+        log.Println("no secret, github webhooks not enabled")
+        g.webhookSecret = []byte("")
+        return
+    }
+    g.webhookSecret = file
+}
+
 // main server startup function
 // compile lists of pages and posts and prepare globals struct
 func (g *Globals) AssembleSite(){
@@ -28,6 +40,7 @@ func (g *Globals) AssembleSite(){
     g.AssemblePages()
     g.AssemblePosts()
     //g.NumProjects = len(g.Projects)
+    g.LoadSecret()
     log.Println(g)
 }
 
@@ -120,3 +133,21 @@ func CreateNewSite(){
     }
     log.Println("Please configure your site by editing config.json. Then, run bloke")
 }
+
+func CreateSecretToken(){
+    f, err := os.Create(".secret")
+    defer f.Close()
+    if err != nil{
+        log.Fatal("Could not create secret file", err)
+    }
+    secret_bytes := make([]byte, 20)
+    _, err = rand.Read(secret_bytes)
+    if err != nil{
+        log.Fatal("could not generate random secret", err)
+    }
+    secret := hex.EncodeToString(secret_bytes)
+    log.Println("copy the following secret into your webhook on github")
+    log.Println("new secret:", secret)
+    f.WriteString(secret)
+}
+
