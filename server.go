@@ -51,8 +51,10 @@ type MetaInfoType struct {
 
 // main site struct
 type Globals struct{
-    Projects []string //map[string]string // map url/file name to display name
-    SubProjects map[string][]string // subprojects are lists of strings. these generate the dropdowns
+    Projects [][]string // list of pairs (url/filename, display name)
+    SubProjects map[string][][]string // map from project-filename to list of pairs (subproject filenames, subproject displayname). these generate the dropdowns
+    // all proj/subproj references should be with url_name!
+
     Posts map[string]map[string]map[string][]string // year, month, day, title
     RecentPosts [][]string // [](title, date_name)
 

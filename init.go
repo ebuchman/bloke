@@ -104,31 +104,66 @@ func (g *Globals) AssemblePosts(){
 // compile list of pages and prepare Globals struct (mostly for filling in the nav bar with pages links)
 // in future, write everything out to static .html files for serving later (so we don't have to render template each time)
 func (g *Globals) AssemblePages(){
+    // g.Projects is a list of strings
+    // g.SubProjects maps projcets to a list of subprojectes (pairs (urlname, displayname))
+    g.SubProjects = make(map[string][][]string)
+
+    // get list of files in pages dir
     files, err := ioutil.ReadDir(SiteRoot+"/pages")
     if err != nil {
         log.Fatal("error reading pages")
     }
-    log.Println(files)
-    g.SubProjects = make(map[string][]string)
+
     for _, f := range files {
+        // if project is not a directory, attempt get name from meta info
         if !f.IsDir(){
-            name := strings.Split(f.Name(), ".")[0]
-            g.Projects = append(g.Projects, name)
-            g.SubProjects[name] = []string{}
+            url_name := strings.Split(f.Name(), ".")[0]
+            display_name := GetTitleFromMetaInfo("pages", url_name)
+            g.Projects = append(g.Projects, []string{url_name, display_name})
         } else{
-            subfiles, err := ioutil.ReadDir(SiteRoot+"/pages/"+f.Name())
+            // project is a directory, and has subprojects
+            // get name from meta-info.json, or fall back to dirname
+            subfiles, err := ioutil.ReadDir(path.Join(SiteRoot, "pages", f.Name()))
             if err != nil {
                 log.Fatal("error reading sub pages")
             }
-            var list []string
+            // go through list of subfiles, get names
+            var subproj_list [][]string // list of pairs (urlname, displayname)
+            parent := f.Name()
             for _, ff := range subfiles{
-                name := strings.Split(ff.Name(), ".")[0]
-                list = append(list, name)
+                url_name := strings.Split(ff.Name(), ".")[0]
+                display_name := GetTitleFromMetaInfo(path.Join(SiteRoot, "pages", parent), url_name)
+                subproj_list = append(subproj_list, []string{url_name, display_name})
             }
-            g.Projects = append(g.Projects, f.Name())
-            g.SubProjects[f.Name()] = list
+
+            // set default project display name
+            project_name := f.Name()
+            // check for project meta-info
+            b, err := ioutil.ReadFile(path.Join(f.Name(), "meta-info.json"))
+            if err == nil{
+                var m MetaInfoType
+                json.Unmarshal(b, &m)
+                if m.Title != ""{
+                    project_name = m.Title 
+                }
+            }
+            g.Projects = append(g.Projects, []string{f.Name(), project_name})
+            g.SubProjects[f.Name()] = subproj_list
         }
     }
+}
+
+// open a file, parse metainfo, return title
+// fallback to filename if no title
+func GetTitleFromMetaInfo(dirPath, name string) string{
+    b, err := ioutil.ReadFile(path.Join(dirPath,name+".md"))
+    if err == nil{
+        metaInfo, _ := ParseMetaInfo(b)
+        if metaInfo.Title != ""{
+            return metaInfo.Title
+        }
+    }
+    return GetTitleFromUrl(name)
 }
 
 // get name from url

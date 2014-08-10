@@ -11,6 +11,7 @@ import (
     "io/ioutil"
     "strings"
     "strconv"
+    "encoding/json"
 )
 
 
@@ -41,7 +42,7 @@ func (g *Globals) LoadPage(dirPath, name string) error{
         return err
     }
 
-    g.MetaInfo = g.ParseMetaInfo(b)
+    g.MetaInfo, b = ParseMetaInfo(b)
     g.Text = g.ParseBubbles(b) 
 
     if g.MetaInfo.Title == ""{
@@ -53,10 +54,21 @@ func (g *Globals) LoadPage(dirPath, name string) error{
     return nil
 }
 
-// parse metainfo
-func (g *Globals) ParseMetaInfo(s []byte) MetaInfoType{
+// parse metainfo. return metainfo struct and remaining bytes
+func ParseMetaInfo(s []byte) (MetaInfoType, []byte){
     var m MetaInfoType
-    return m
+    r, err := regexp.Compile(`---\n((?s).+?)\n---`)
+    if err != nil{
+        log.Println("shitty regexp bro..")
+    }
+    match := r.FindSubmatch(s)
+    if len(match) > 0{
+        full_match := match[0]  // 0 is the match, 1 is the first submatch
+        meta_info_bytes := match[1]
+        json.Unmarshal(meta_info_bytes, &m)
+        s = s[len(full_match):]
+    }
+    return m, s
 }
 
 // parse and replace for bubbles and markdown to js/html
@@ -118,14 +130,14 @@ func (g *Globals) IsPage(name string) bool{
     isPage := -1
     //find index of project
     for i, k := range g.Projects{
-        if parts[0] == k{
+        if parts[0] == k[0]{
             isPage = i
             break
         }
     }
     // if project exists and request for subproject, check subproject exists
     if isPage>-1 && len(parts) == 2{
-        _, ok := g.SubProjects[g.Projects[isPage]]
+        _, ok := g.SubProjects[g.Projects[isPage][0]]
         if !ok{
             isPage = -1
         }
@@ -133,8 +145,4 @@ func (g *Globals) IsPage(name string) bool{
 
     return isPage > -1
 }
-
-
-
-
 

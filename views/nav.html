@@ -1,25 +1,26 @@
 
 <nav class="navbar navbar-default" role="navigation">
   <div class="container-fluid">
-                {{ $subprojs := .SubProjects }}
+            {{ $subprojs := .SubProjects }}
             <!-- Collect the nav links, forms, and other content for toggling -->
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
               <ul class="nav navbar-nav">
                 <li><a href="/">Home</a></li>
                 {{range $proj := .Projects}}
-                    {{ $sp := index $subprojs $proj }}
+                    {{ $proj0 := index $proj 0}}
+                    {{ $sp := index $subprojs $proj0}}
                     {{ if $sp }}
                         <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">{{$proj}}<span class="caret"></span></a>
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">{{index $proj 1}}<span class="caret"></span></a>
                           <ul class="dropdown-menu" role="menu">
                             {{ range $s := $sp }} 
-                            <li><a href="/{{$proj}}/{{$s}}">{{$s}}</a></li>
+                            <li><a href="/{{index $proj 0}}/{{index $s 0}}">{{index $s 1}}</a></li>
                                 <li class="divider"></li>
                             {{ end }}
                           </ul>
                         </li>
                     {{ else }}
-                    <li><a href="/{{$proj}}">{{$proj}}</a></li>
+                        <li><a href="/{{index $proj 0}}">{{index $proj 1}}</a></li>
                     {{ end }}
                 {{ end }} 
 
