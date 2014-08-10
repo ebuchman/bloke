@@ -15,8 +15,6 @@ import (
     "encoding/hex"
     "crypto/hmac"
     "crypto/sha1"
-//    "regexp"
-//    "github.com/russross/blackfriday" // parsing markdown
 )
 
 /* TODO
@@ -59,17 +57,17 @@ type Globals struct{
 
     Config ConfigType
 
-    webhookSecret []byte
+    webhookSecret []byte // secret key for authenticating github webhook requests
 }
 
-// main routing function
+/* main routing function
+    url is either
+        /                                   home page (recent blog posts)  
+        /posts/Date-PostName                a specific blog post
+        /ProjectName                        a particular project page
+*/ 
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         log.Println("handle Index", r.URL.Path)
-        /* url is either
-            /                                   home page (recent blog posts)  
-            /posts/Date-PostName                a specific blog post
-            /ProjectName                        a particular project page
-        */ 
         if len(r.URL.Path[1:]) > 0{
             path_elements := strings.Split(r.URL.Path[1:], "/")
             // posts
