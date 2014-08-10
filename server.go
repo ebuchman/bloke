@@ -1,33 +1,34 @@
 package main
 
 import (
-    "github.com/russross/blackfriday" // parsing markdown
     "net/http"
-    "text/template"
     "strings"
     "log"
     "io/ioutil"
     "os"
     "path"
-    "regexp"
     "fmt"
-    "encoding/json"
     "flag"
     "os/exec"
     "bytes"
-    "time"
+    "strconv"
+    "encoding/hex"
+    "crypto/hmac"
+    "crypto/sha1"
+//    "encoding/json"
 )
 
 /* TODO
+    - parse for images, pdfs, 
+    - github webhook
     - ensure access is properly restricted
     - make sure bubble entries exist before replacing [[] []] with link
-        - if not, add text "this bubble does not exist, make it on github..."
-    - watch github repo and update
-    - robustify posts functionality
+        - if not, add text "this bubble does not exist, make it on github...", create .md file
+    - add tls support
     - clean up js bubbles so they follow user as they scroll
     - meta info (pages, posts, bubbles)
     - add "technical explanation" part to bubbles
-
+    - robustify posts functionality
 */
 
 // bloke should be launched from the sites root
@@ -37,50 +38,23 @@ var GoPath = os.Getenv("GOPATH")
 var BlokePath = GoPath + "/src/github.com/ebuchman/bloke" // is there a nicer way to get this?
 
 var InitSite = flag.String("init", "", "path to new site dir")
+var ListenPort = flag.Int("port", 9099, "port to listen for incoming connections")
 
-//parse template files
-var templates = template.Must(template.ParseFiles(BlokePath+"/views/page.html", BlokePath+"/views/nav.html", BlokePath+"/views/footer.html", BlokePath+"/views/bubbles.html"))
-
-func RenderTemplateToFile(tmpl, save_file string, p interface{}){
-    //we already parsed the html templates
-    f, err := os.Create(SiteRoot+"/sites/"+save_file+".html")
-    if err != nil{
-        log.Fatal("err opening file:", err)
-    }
-    err = templates.ExecuteTemplate(f, tmpl+".html", p)
-    if err != nil {
-        log.Fatal("err writing template to file", err)
-    }
+type ConfigType struct{
+    SiteName string `json:"site_name"`
+    Email string `json:"email"`
+    Site string `json:"site"`
 }
 
-func renderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
-    //we already parsed the html templates
-    err := templates.ExecuteTemplate(w, tmpl+".html", p)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-    }
-}
+type Globals struct{
+    Projects []string // names of projects
+    SubProjects map[string][]string // subprojects are either list of strings or empty. these generate the dropdowns
+    Posts map[string]map[string]map[string][]string // year, month, day, title
+    RecentPosts [][]string // [](title, date_name)
+    Text string
+    Title string
 
-// get name from blogpost url
-func GetNameFromPost(s string) string{
-       date_name := strings.Split(strings.Split(s, ".")[0], "-")
-       title := date_name[3]
-       return title
-}
-
-// parse and replace for bubbles and markdown to js/html
-// takes the raw txt.md bytes
-func DataTransform(s []byte) string{
-    r, _ := regexp.Compile(`\[\[(.+?)\] \[(.+?)\]\]?`)
-    s = blackfriday.MarkdownCommon(s)
-    return r.ReplaceAllString(string(s), `<a href="#/" onClick="get_entry_data('$2')">$1</a>`)
-}
-
-// error function
-func (g *Globals) errorPage(w http.ResponseWriter, err error){
-    g.Title = "Error"
-    g.Text = err.Error()
-    renderTemplate(w, "page", g)
+    Config ConfigType
 }
 
 // main routing function
@@ -101,7 +75,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
                     g.errorPage(w, err)
                     return 
                 }
-                g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
+                g.Text = DataTransform(b) 
                 g.Title = GetNameFromPost(r.URL.Path[1:])
             // pages
             }else{
@@ -110,7 +84,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
                     g.errorPage(w, err)
                     return 
                 }
-                g.Text = DataTransform(b) //string(blackfriday.MarkdownCommon(b))
+                g.Text = DataTransform(b) 
                 log.Println(SiteRoot+"/pages/"+r.URL.Path[1:]+".md")
                 split_path := strings.Split(r.URL.Path[1:], "/")
                 g.Title = split_path[len(split_path)-1]
@@ -122,7 +96,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
                 g.errorPage(w, err)
                 return 
             }
-            g.Text = string(blackfriday.MarkdownCommon(b))
+            g.Text = DataTransform(b) 
             g.Title = g.RecentPosts[0][0]
         }
         renderTemplate(w, "page", g)
@@ -141,6 +115,74 @@ func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
     fmt.Fprintf(w, DataTransform(b))
 }
 
+// github webhook response (confirm valid post request, git pull)
+func (g *Globals) gitResponse(w http.ResponseWriter, r *http.Request){
+    log.Println("githook!")
+    log.Println(r.Header)
+    header := r.Header
+    agent := header["User-Agent"][0]
+    event := header["X-Github-Event"][0]
+    sig := header["X-Hub-Signature"][0]
+
+    if !strings.Contains(agent, "GitHub"){
+        log.Println("git request from non Github agent")
+        return
+    }
+
+    if !(strings.Contains(event, "commit") || strings.Contains(event, "ping")){
+        log.Println("git request for non commit or ping event")
+        return
+    }
+
+    p := make([]byte, r.ContentLength)    
+    _, err := r.Body.Read(p)
+    if err != nil{
+        log.Println("error reading http.req", err)
+        return
+    }
+
+    key := []byte(os.Getenv("SECRET_TOKEN"))
+    sigbytes, err := hex.DecodeString(sig[5:])
+    if err != nil{
+        log.Println("no hex to bytes!", err)
+    }
+
+    if !CheckMAC(p, sigbytes, key){
+        log.Println("git request with invalid signature")
+        return
+    }
+
+    g.GitPull()
+}
+
+// CheckMAC returns true if messageMAC is a valid HMAC tag for message.
+func CheckMAC(message, messageMAC, key []byte) bool {
+    mac := hmac.New(sha1.New, key)
+    mac.Write(message)
+    expectedMAC := mac.Sum(nil)
+    return hmac.Equal(messageMAC, expectedMAC)
+}
+
+// if git pull not up to date, refresh Globals
+func (g *Globals) GitPull(){
+     cmd := exec.Command("git", "pull", "origin", "master")
+     var out bytes.Buffer
+     cmd.Stdout = &out
+     cmd.Run()
+     log.Println(out.String())
+     if !strings.Contains(out.String(), "already up-to-date"){
+        g.Refresh()
+     }
+}
+
+// create new globals, copy over (eg. after git pull)
+func (g *Globals) Refresh(){
+    gg := Globals{}
+    gg.LoadConfig()
+    gg.AssembleSite()
+    *g = gg
+}
+
 // serve static files (assets)
 func serveFile(w http.ResponseWriter, r *http.Request){
     // if img, load from SiteRoot
@@ -153,7 +195,7 @@ func serveFile(w http.ResponseWriter, r *http.Request){
         ext := subs[len(subs)-1]
         if ext == "js" || ext == "css"{
             http.ServeFile(w, r, path.Join(BlokePath, r.URL.Path[1:]))
-        }else if ext == "png" || ext == "jpg"{
+        }else if ext == "png" || ext == "jpg" || ext == "pdf" {
             http.ServeFile(w, r, path.Join(SiteRoot, r.URL.Path[1:]))
         }
     }
@@ -169,169 +211,20 @@ func servePage(w http.ResponseWriter, r *http.Request){
     }
 }
 
-// compile list of pages and prepare Globals struct (mostly for filling in the nav bar with pages links)
-// in future, write everything out to static .html files for serving later (so we don't have to render template each time)
-func (g *Globals) AssemblePages(){
-    files, err := ioutil.ReadDir(SiteRoot+"/pages")
-    if err != nil {
-        log.Fatal("error reading pages")
-    }
-    log.Println(files)
-    g.SubProjects = make(map[string][]string)
-    for _, f := range files {
-        if !f.IsDir(){
-            name := strings.Split(f.Name(), ".")[0]
-            g.Projects = append(g.Projects, name)
-            g.SubProjects[name] = []string{}
-        } else{
-            subfiles, err := ioutil.ReadDir(SiteRoot+"/pages/"+f.Name())
-            if err != nil {
-                log.Fatal("error reading sub pages")
-            }
-            var list []string
-            for _, ff := range subfiles{
-                name := strings.Split(ff.Name(), ".")[0]
-                list = append(list, name)
-            }
-            g.Projects = append(g.Projects, f.Name())
-            g.SubProjects[f.Name()] = list
-        }
-    }
-}
-
-// compile list of posts and fill in Globals struct
-func (g *Globals) AssemblePosts(){
-    // posts dir should be fill with files like 2014-06-12-Name.md
-    // No directories
-    files, err := ioutil.ReadDir(SiteRoot+"/posts")
-    if err != nil {
-        log.Fatal("error reading pages")
-    }
-    for _, f := range files {
-        if !f.IsDir(){
-           date_name := strings.Split(strings.Split(f.Name(), ".")[0], "-")
-           //year := date_name[0]
-           //month := date_name[1]
-           //day := date_name[2]
-           title := date_name[3]
-           g.RecentPosts = append(g.RecentPosts, []string{title, f.Name()})
-        }
-    }
-
-}
-
-// main server startup function
-// compile lists of pages and posts and prepare globals struct
-func (g *Globals) AssembleSite(){
-    // go through pages and posts and entries
-    //RenderTemplateToFile("page", "main", g)
-    g.AssemblePages()
-    g.AssemblePosts()
-    //g.NumProjects = len(g.Projects)
-    log.Println(g)
-}
-
-type ConfigType struct{
-    SiteName string `json:"site_name"`
-    Email string `json:"email"`
-    Site string `json:"site"`
-}
-
-type Globals struct{
-    Projects []string // names of projects
-    SubProjects map[string][]string // subprojects are either list of strings or empty. these generate the dropdowns
-    Posts map[string]map[string]map[string][]string // year, month, day, title
-    RecentPosts [][]string // [](title, date_name)
-    Text string
-    Title string
-
-    Config ConfigType
-}
-
-func (g * Globals) LoadConfig(){
-    file, e := ioutil.ReadFile(path.Join(SiteRoot, "config.json"))
-    if e != nil{
-        log.Fatal("no config", e)
-    }
-    var c ConfigType
-    json.Unmarshal(file, &c)
-    g.Config = c
-}
-
-func CreateNewSite(){
-    os.Mkdir(*InitSite, 0777) // apparently 6s aren't sufficient here?
-    os.Mkdir(path.Join(*InitSite, "bubbles"), 0666)
-    os.MkdirAll(path.Join(*InitSite, "imgs"), 0666)
-    os.MkdirAll(path.Join(*InitSite, "pages"), 0666)
-    os.MkdirAll(path.Join(*InitSite, "posts"), 0666)
-
-    f, err := os.Create(path.Join(*InitSite, "config.json"))
-    defer f.Close()
-    if err != nil{
-     log.Println("Could not create config file:", err)
-    }else{
-        /*
-        c := ConfigType{SiteName: *InitSite}
-        jc, _ := json.Marshal(c)
-        enc := json.NewEncoder(f)
-        err := enc.Encode(jc)
-        if err != nil{
-            log.Fatal(err)
-        }
-        */ // why can't I write a clean config file?
-        f.WriteString("{\n")
-        f.WriteString("\t\"site_name\": \""+*InitSite+"\",\n")
-        f.WriteString("\t\"email\": \"\",\n")
-        f.WriteString("\t\"site\": \"\"\n")
-        f.WriteString("\t\"github_repo\": \"\"\n")
-        f.WriteString("}")
-    }
-    log.Println("Please configure your site by editing config.json. Then, run bloke")
-}
-
-// every minute, try git pull
-func (g *Globals) MonitorRepo(){
-    for {
-        time.Sleep(time.Minute)
-        g.GitPull()
-    }
-}
-
-// if git pull not up to date, refresh Globals
-func (g *Globals) GitPull(){
-     cmd := exec.Command("git", "pull", "origin", "master")
-     var out bytes.Buffer
-     cmd.Stdout = &out
-     cmd.Run()
-     log.Println(out.String())
-     if !strings.Contains(out.String(), "already up-to-date"){
-        g.Refresh()
-     }
-}
-
-// create new globals, copy over
-func (g *Globals) Refresh(){
-    gg := Globals{}
-    gg.LoadConfig()
-    gg.AssembleSite()
-    *g = gg
-}
-
 
 func StartServer(){
     g := Globals{}
     g.LoadConfig()
     g.AssembleSite()
 
-    // monitor site repo for any new changes
-    go g.MonitorRepo()
-
     http.HandleFunc("/", g.handleIndex) // main page (/, /posts, /pages)
-    http.HandleFunc("/imgs/", serveFile)
-    http.HandleFunc("/assets/", serveFile) // static files
+    http.HandleFunc("/imgs/", serveFile) // static images (png, jpg)
+    http.HandleFunc("/files/", serveFile) // static documents (pdfs)
+    http.HandleFunc("/assets/", serveFile) // static js, css files
     http.HandleFunc("/bubbles/", g.ajaxResponse) // async bubbles
+    http.HandleFunc("/git/", g.gitResponse) // github webhook
 
-    http.ListenAndServe(":9099", nil)
+    http.ListenAndServe(":"+strconv.Itoa(*ListenPort), nil)
 }
 
 func main(){
