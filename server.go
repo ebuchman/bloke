@@ -51,8 +51,8 @@ type MetaInfoType struct {
 
 // main site struct
 type Globals struct{
-    Projects []string // names of projects
-    SubProjects map[string][]string // subprojects are either list of strings or empty. these generate the dropdowns
+    Projects []string //map[string]string // map url/file name to display name
+    SubProjects map[string][]string // subprojects are lists of strings. these generate the dropdowns
     Posts map[string]map[string]map[string][]string // year, month, day, title
     RecentPosts [][]string // [](title, date_name)
 
@@ -132,25 +132,27 @@ func (g *Globals) gitResponse(w http.ResponseWriter, r *http.Request){
     agent := header["User-Agent"][0]
     event := header["X-Github-Event"][0]
     sig := header["X-Hub-Signature"][0]
-
     // assert GitHub agent
     if !strings.Contains(agent, "GitHub"){
         log.Println("git request from non Github agent")
         return
     }
-
     // assert event type
-    if !(strings.Contains(event, "commit") || strings.Contains(event, "ping")){
-        log.Println("git request for non commit or ping event")
+    if !(strings.Contains(event, "push") || strings.Contains(event, "ping")){
+        log.Println("git request for non push or ping event")
         return
     }
-
     // check HMAC
     p := make([]byte, r.ContentLength)    
-    _, err := r.Body.Read(p)
-    if err != nil{
-        log.Println("error reading http.req", err)
-        return
+    sum := 0
+    // read http req - there is almost certainly a oneline for this...
+    for sum < int(r.ContentLength){
+        n, err := r.Body.Read(p[sum:])
+        if err != nil{
+            log.Println("error reading http.req", err)
+            return
+        }
+        sum += n
     }
     key := g.webhookSecret
     sigbytes, err := hex.DecodeString(sig[5:]) // sig begins with "sha1:"
@@ -172,6 +174,7 @@ func CheckMAC(message, messageMAC, key []byte) bool {
     mac := hmac.New(sha1.New, key)
     mac.Write(message)
     expectedMAC := mac.Sum(nil)
+    log.Println(hex.EncodeToString(expectedMAC), hex.EncodeToString(messageMAC))
     return hmac.Equal(messageMAC, expectedMAC)
 }
 
