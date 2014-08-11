@@ -71,34 +71,12 @@ func ParseMetaInfo(s []byte) (MetaInfoType, []byte){
     return m, s
 }
 
-// check if bubble exists. if not, create, return true
-func CheckCreateBubble(name string) bool{
-    _, err := os.Stat(path.Join("bubbles", name+".md"))
-    if err != nil{
-        f, err := os.Create(path.Join("bubbles", name+".md"))
-        if err != nil{
-            log.Println("could not create new bubble file")
-        } else{
-            f.WriteString(NewBubbleString)
-        }
-        return true
-    }
-    return false
-}
-
 // parse and replace for bubbles and markdown to js/html
 // takes the raw txt.md bytes
 // creates new bubble entries if they are referenced but don't exist
 func ParseBubbles(s []byte) string{
     r, _ := regexp.Compile(`\[\[(.+?)\] \[(.+?)\]\]?`)
     s = blackfriday.MarkdownCommon(s)
-
-    // get all matches, check if they exist, add them if not...
-    for _, match := range r.FindAllStringSubmatch(string(s), -1){
-        name := match[2]
-        CheckCreateBubble(name)
-    }
-
     return r.ReplaceAllString(string(s), `<a href="#/" onClick="get_entry_data('$2')">$1</a>`)
 }
 

@@ -152,7 +152,8 @@ func ParseFileForNewBubbles(pathname string) []string{
     new_bubbles := []string{}
     for _, match := range r.FindAllStringSubmatch(string(b), -1){
         name := match[2]
-        if CheckCreateBubble(name){
+        _, err := os.Stat(path.Join("bubbles", name+".md"))
+        if err != nil{
             new_bubbles = append(new_bubbles, name)
         }
     }
