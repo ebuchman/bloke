@@ -249,16 +249,35 @@ func GetTitleFromUrl(s string) string{
        return split_path[len(split_path)-1]
 }
 
+func CheckFatal(err error){
+    if err != nil{
+        log.Fatal(err)
+    }
+}
+
 // called on `bloke --init _InitSite`
 func CreateNewSite(){
-    os.Mkdir(*InitSite, 0777) // apparently 6s aren't sufficient here?
-    os.Mkdir(path.Join(*InitSite, "bubbles"), 0666)
-    os.MkdirAll(path.Join(*InitSite, "imgs"), 0666)
-    os.MkdirAll(path.Join(*InitSite, "files"), 0666)
-    os.MkdirAll(path.Join(*InitSite, "pages"), 0666)
-    os.MkdirAll(path.Join(*InitSite, "posts"), 0666)
+    // create main folder
+    CheckFatal(os.Mkdir(*InitSite, 0777))// apparently 6s aren't sufficient here?
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "bubbles"), 0666))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "imgs"), 0666))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "files"), 0666))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "pages"), 0666))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "posts"), 0666))
 
-    f, err := os.Create(path.Join(*InitSite, "config.json"))
+    // create glossary page
+    f, err := os.Create(path.Join(*InitSite, "pages", "Glossary.md"))
+    gloss_success := false
+    if err != nil{
+     log.Println("Could not create glossary file:", err)
+    }else{
+        f.WriteString("Below you will find a glossary of all bubbles")
+        gloss_success = true
+    }
+    f.Close()
+
+    // create and initialize config file
+    f, err = os.Create(path.Join(*InitSite, "config.json"))
     defer f.Close()
     if err != nil{
      log.Println("Could not create config file:", err)
@@ -277,8 +296,14 @@ func CreateNewSite(){
         f.WriteString("\t\"email\": \"\",\n")
         f.WriteString("\t\"site\": \"\",\n")
         f.WriteString("\t\"github_repo\": \"\"\n")
+        if gloss_success{
+            f.WriteString("\t\"glossary_file\": \"Glossary.md\"\n")
+        } else{
+            f.WriteString("\t\"glossary_file\": \"\"\n")
+        }
         f.WriteString("}")
     }
+
     log.Println("Your site has been created!")
     log.Println("To configure your site, please edit config.json. Then, run bloke. Link up with a github repo anytime!")
 }

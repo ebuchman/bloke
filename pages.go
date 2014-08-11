@@ -36,7 +36,7 @@ func (g *Globals) errorPage(w http.ResponseWriter, err error){
 }
 
 // load and parse a page and relevent metainfo 
-func (page *PageType) LoadPage(dirPath, name string) error{
+func (g *Globals) LoadPage(dirPath, name string, page *PageType) error{
     // read markdown file
     b, err := ioutil.ReadFile(path.Join(dirPath,name+".md"))
     if err != nil{
@@ -51,7 +51,35 @@ func (page *PageType) LoadPage(dirPath, name string) error{
     }else {
         page.Title = page.MetaInfo.Title
     }
+    page.Name = name
+
+    //set flags
+    page.IsGlossary = g.Config.Glossary == page.Name
+    log.Println(page.IsGlossary)
+
     return nil
+}
+
+// load bubble, parse text, return html string
+// will need an upgrade to json for metainfo...
+func LoadBubble(name string) string{
+    _, err := os.Stat(path.Join(SiteRoot, name))
+    bubble_content := ""
+    if err == nil{
+        b, err := ioutil.ReadFile(path.Join(SiteRoot, name))
+        if err != nil{
+            log.Println("error on bubble ", name, err)
+            b = []byte("there was an error reading this bubble")
+        }
+        if len(b) == 0{
+            bubble_content = ParseBubbles([]byte(NewBubbleString))
+        }else {
+            bubble_content = ParseBubbles(b)
+        }
+    } else{
+        bubble_content = ParseBubbles([]byte(NewBubbleString))
+    }
+    return bubble_content
 }
 
 // parse metainfo. return metainfo struct and remaining bytes

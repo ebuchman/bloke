@@ -17,6 +17,7 @@ import (
     "crypto/sha1"
     "errors"
     "github.com/howeyc/fsnotify"
+    "encoding/json"
 )
 
 /* TODO
@@ -55,6 +56,7 @@ type ConfigType struct{
     Email string `json:"email"`
     Site string `json:"site"`
     Repo string `json:"github_repo"`
+    Glossary string `json:"glossary_file"`
 }
 
 // meta info struct. read from json
@@ -71,9 +73,13 @@ type ViewType struct{
 
 // info specific to the page requested by a client
 type PageType struct{
+    Name string //URL name of this page
     Text string // text of current page
     Title string // title of current page
     MetaInfo MetaInfoType // struct of meta info for current page
+
+    // bloke flags (trigger specialized html/templating)
+    IsGlossary bool
 }
 
 // main site struct
@@ -110,14 +116,14 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }
             //posts
             if IsPost(path_elements[0]){
-                err := page.LoadPage(path.Join(SiteRoot, "posts"), r.URL.Path[1:])
+                err := g.LoadPage(path.Join(SiteRoot, "posts"), r.URL.Path[1:], page)
                 if err != nil{
                     g.errorPage(w, err)
                     return
                 }
             //pages
             }else if g.IsPage(r.URL.Path[1:]){
-                err := page.LoadPage(path.Join(SiteRoot, "pages"), r.URL.Path[1:])
+                err := g.LoadPage(path.Join(SiteRoot, "pages"), r.URL.Path[1:], page)
                 if err != nil{
                     g.errorPage(w, err)
                     return 
@@ -128,7 +134,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }
         //home
         } else {
-            err := page.LoadPage(path.Join(SiteRoot, "posts"), g.RecentPosts[0][1])
+            err := g.LoadPage(path.Join(SiteRoot, "posts"), g.RecentPosts[0][1], page)
             if err != nil{
                 g.errorPage(w, err)
                 return 
@@ -137,25 +143,43 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         renderTemplate(w, "page", ViewType{Page:page, Globals:g})
 }
 
+type AjaxResponseType struct{
+    Bubbles [][]string `json:"bubbles"`
+}
+
 // ajax bubble response
 // if bubblename.md doesnt exist or is blank, return the NewBubbleString
-// r.URL.Path should be /bubbles/bubble-name
+// r.URL.Path should be /bubbles/bubble-name or just /bubbles/ to return all entries
 func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
-    _, err := os.Stat(path.Join(SiteRoot, r.URL.Path[1:]))
-    if err == nil{
-        b, err := ioutil.ReadFile(path.Join(SiteRoot, r.URL.Path[1:]))
+    split := strings.Split(r.URL.Path[1:], "/")
+    log.Println(split)
+    response := AjaxResponseType{[][]string{}}
+    if len(split) > 1 && split[1] != ""{
+        // TODO: assert length is 2, file name. this should probably be in the post request not url...
+        log.Println("this is a single bubble")
+        // if the url came with a name, return that bubble
+        // maybe we should pass the name in a post request instead of url?
+        bubble_content := LoadBubble(r.URL.Path[1:])
+        response.Bubbles = append(response.Bubbles, []string{split[1], bubble_content})
+    } else {
+    // else, return all bubbles
+    log.Println("all bubbles")
+        files, err := ioutil.ReadDir(path.Join(SiteRoot, "bubbles"))
         if err != nil{
-            log.Println("error on bubble ", r.URL.Path[1:], err)
-            b = []byte("there was an error reading this bubble")
+            log.Println("couldn't read bubble dir", err);
+            return
         }
-        if len(b) == 0{
-            fmt.Fprintf(w, ParseBubbles([]byte(NewBubbleString)))
-        }else {
-            fmt.Fprintf(w, ParseBubbles(b))
+        for _, f := range files{
+            name := f.Name()
+            bubble_content := LoadBubble(path.Join("bubbles", name))
+            response.Bubbles = append(response.Bubbles, []string{name, bubble_content})
         }
-    } else{
-        fmt.Fprintf(w, ParseBubbles([]byte(NewBubbleString)))
     }
+    b, err := json.Marshal(response)
+    if err != nil{
+        log.Println("could not marshal response to json", err)
+    }
+    fmt.Fprintf(w, string(b))
 }
 
 // github webhook response (confirm valid post request, git pull)
@@ -256,7 +280,7 @@ func serveFile(w http.ResponseWriter, r *http.Request){
             p := path.Join(SiteRoot, r.URL.Path[1:])
             _, err := os.Stat(p)
             if err == nil{
-                http.ServeFile(w, r, p))
+                http.ServeFile(w, r, p)
             }
         }
     }
