@@ -7,10 +7,12 @@ Features
 - http server with ajax support for wiki-bubbles (links to javascript bubbles that serve as a site-wide wiki)
 - automatically generate pages, blog posts, and wiki-bubbles from markdown files
 - serve images and pdfs
+- convenient testing: automatically detect and serve edits and new files
 - use subdirectories for pages (dropdown lists in the navbar)
-- automatic update on push to github using webhooks (requires configuration - see below)
+- simple production deploy: automatically update on push to github (uses webhooks, requires configuration - see below)
 - manage community edits using github!
 - extended markdown for linking to wiki-bubbles
+- meta-info for each post, page, and bubble
 
 How-To
 ---

@@ -28,11 +28,14 @@ func (g * Globals) LoadConfig(){
     if g.Config.Repo != ""{
         log.Println("Iniitializing git repo and syncing with github remote...")
         // initialize as git repo
-        cmd := exec.Command("git", "init")
-        cmd.Run()
+        _, err := os.Stat(".git")
+        if err != nil{
+            cmd := exec.Command("git", "init")
+            cmd.Run()
+        }
 
         // check remote host
-        cmd = exec.Command("git", "remote", "--v")
+        cmd := exec.Command("git", "remote", "--v")
         var out bytes.Buffer
         cmd.Stdout = &out
         cmd.Run()
@@ -82,7 +85,7 @@ func (g *Globals) AssembleSite(){
     g.AssemblePages()
     g.AssemblePosts()
     g.LoadSecret()
-    log.Println(g)
+    //log.Println(g)
 }
 
 // compile list of posts and fill in Globals struct
@@ -161,6 +164,7 @@ func ParseFileForNewBubbles(pathname string, new_bubbles *map[string]bool) {
     }
 }
 
+// read dir, ignore hidden files/folders
 func ReadDir(dir string)[] os.FileInfo{
     files, err := ioutil.ReadDir(dir)
     if err != nil {

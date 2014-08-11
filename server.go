@@ -16,6 +16,7 @@ import (
     "crypto/hmac"
     "crypto/sha1"
     "errors"
+    "github.com/howeyc/fsnotify"
 )
 
 /* TODO
@@ -259,12 +260,59 @@ func servePage(w http.ResponseWriter, r *http.Request){
     }
 }
 
+// watch directory callback
+// kind of messy since it fires soo much
+func (g *Globals) WatchDirCallback(watcher *fsnotify.Watcher){
+    for {
+        select {
+        case ev := <-watcher.Event:
+            log.Println("event:", ev)
+            // only refresh if name is not hidden
+            split := strings.Split(ev.Name, "/")
+            name := split[len(split)-1]
+            if !strings.HasPrefix(name, ".") && !strings.HasSuffix(name, "~"){
+                g.Refresh()            
+            }
+        case err := <-watcher.Error:
+            log.Println("error:", err)
+        }
+    }
+}
+
+// recursive watch all directories
+func (g *Globals) WatchDirs(watcher *fsnotify.Watcher, dir string){
+    err := watcher.Watch(dir)
+    if err != nil {
+        log.Println("Could'nt watch dir", dir, err)
+    }
+    files := ReadDir(dir)
+    if err != nil{
+        log.Println("Couldn't read dir", dir, err)
+    }
+    
+    for _, f := range files{
+        if f.IsDir(){
+            g.WatchDirs(watcher, path.Join(dir, f.Name()))
+        }
+    }
+}
 
 func StartServer(){
     // load config, compile lists of site contents
     var g = Globals{}
     g.LoadConfig()
     g.AssembleSite()
+
+    // set up new watcher
+    watcher, err := fsnotify.NewWatcher()
+    defer watcher.Close()
+    if err != nil {
+        log.Fatal(err)
+    }
+    // watch dir callback
+    go g.WatchDirCallback(watcher)
+    // recursive watch dirs. when an event fires in any dir, it'll hit the callback
+    g.WatchDirs(watcher, ".")
 
     // routing functions
     http.HandleFunc("/", g.handleIndex) // main page (/, /posts, /pages)
