@@ -142,8 +142,9 @@ func ParseForNewBubbles() []string{
 
 // Find all bubbles, check against old_bubbles, return new bubbles
 func ParseFileForNewBubbles(pathname string) []string{
-    b, err := ioutil.ReadFile(pathname+".md")
+    b, err := ioutil.ReadFile(pathname)
     if err != nil{
+        log.Println("error reading file", pathname, err)
         return []string{}
     }
     r, _ := regexp.Compile(`\[\[(.+?)\] \[(.+?)\]\]?`)
@@ -151,8 +152,9 @@ func ParseFileForNewBubbles(pathname string) []string{
     new_bubbles := []string{}
     for _, match := range r.FindAllStringSubmatch(string(b), -1){
         name := match[2]
-        new_bubbles = append(new_bubbles, name)
-        CheckCreateBubble(name)
+        if CheckCreateBubble(name){
+            new_bubbles = append(new_bubbles, name)
+        }
     }
     return new_bubbles 
 }
@@ -263,7 +265,7 @@ func CreateNewSite(){
         f.WriteString("}")
     }
     log.Println("Your site has been created!")
-    log.Println("To configure your site, please edit config.json. Then, run bloke")
+    log.Println("To configure your site, please edit config.json. Then, run bloke. Link up with a github repo anytime!")
 }
 
 func CreateSecretToken(){
@@ -282,4 +284,16 @@ func CreateSecretToken(){
     log.Println("new secret:", secret)
     f.WriteString(secret)
 }
+
+func WriteArrayToFile(filename string, array []string){
+    f, err := os.Create(filename)
+    defer f.Close()
+    if err != nil{
+        log.Println("Could not create new file", err)
+    }
+    for _, l := range array{
+        f.WriteString(l+"\n")
+    }
+}
+
 
