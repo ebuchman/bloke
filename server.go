@@ -142,11 +142,18 @@ func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
     //path_split := strings.Split(r.URL.Path[1:], "/")
     // path_split [0] should be "bubble"
     //bubble := path_split[1]
-    b, err := ioutil.ReadFile(path.Join(SiteRoot, r.URL.Path[1:]))
-    if err != nil{
-        log.Println("error on bubble ", r.URL.Path[1:], err)
+
+    _, err := os.Stat(path.Join(SiteRoot, r.URL.Path[1:]))
+    if err == nil{
+        b, err := ioutil.ReadFile(path.Join(SiteRoot, r.URL.Path[1:]))
+        if err != nil{
+            log.Println("error on bubble ", r.URL.Path[1:], err)
+            b = []byte("there was an error reading this bubble")
+        }
+        fmt.Fprintf(w, ParseBubbles(b))
+    } else{
+        fmt.Fprintf(w, NewBubbleString)
     }
-    fmt.Fprintf(w, ParseBubbles(b))
 }
 
 // github webhook response (confirm valid post request, git pull)
