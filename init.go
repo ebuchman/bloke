@@ -11,6 +11,7 @@ import (
     "encoding/hex"
     "crypto/rand"
     "bytes"
+    "regexp"
 )
 
 // load config struct from config.json
@@ -23,6 +24,7 @@ func (g * Globals) LoadConfig(){
     json.Unmarshal(file, &c)
     g.Config = c
 
+    // sync with git repo first time
     if g.Config.Repo != ""{
         log.Println("Iniitializing git repo and syncing with github remote...")
         // initialize as git repo
@@ -58,14 +60,15 @@ func (g * Globals) LoadConfig(){
     }
 }
 
+// load webhooks secret from file
 func (g *Globals) LoadSecret(){
-    file, e := ioutil.ReadFile(path.Join(SiteRoot, ".secret"))
+    b, e := ioutil.ReadFile(path.Join(SiteRoot, ".secret"))
     if e != nil{
         log.Println("no secret, github webhooks not enabled")
         g.webhookSecret = []byte("")
         return
     }
-    g.webhookSecret = file
+    g.webhookSecret = b
 }
 
 // main server startup function
@@ -99,6 +102,59 @@ func (g *Globals) AssemblePosts(){
         }
     }
 
+}
+
+// search every file for new bubbles, create them, return list of new_bubbles
+func ParseForNewBubbles() []string{
+    new_bubbles := []string{}
+    folders := []string{"bubbles", "posts", "pages"}
+    // compose list of bubbles to make
+    for _, folder := range folders{
+        // read folder
+        files, err := ioutil.ReadDir(path.Join(SiteRoot, folder))
+        if err != nil{
+            log.Fatal("error reading", folder, err)
+        }   
+        // for each file in folder, parse for new bubbles
+        for _, file := range files{
+            if !file.IsDir(){
+                bubbles := ParseFileForNewBubbles(path.Join(folder, file.Name()))
+                if len(bubbles) > 0{
+                    new_bubbles = append(new_bubbles, bubbles...)
+                }
+            } else{
+                // if file is a dir, read dir, for each subfile, parse for new bubbles
+                subfiles, err := ioutil.ReadDir(path.Join(SiteRoot, folder, file.Name()))
+                if err != nil{
+                    log.Fatal("error reading", folder, file, err)
+                }
+                for _, subfile := range subfiles{
+                    bubbles := ParseFileForNewBubbles(path.Join(folder, file.Name(), subfile.Name()))
+                    if len(bubbles) > 0{
+                        new_bubbles = append(new_bubbles, bubbles...)
+                    }
+                }
+            }
+        }
+    }
+    return new_bubbles
+}
+
+// Find all bubbles, check against old_bubbles, return new bubbles
+func ParseFileForNewBubbles(pathname string) []string{
+    b, err := ioutil.ReadFile(pathname+".md")
+    if err != nil{
+        return []string{}
+    }
+    r, _ := regexp.Compile(`\[\[(.+?)\] \[(.+?)\]\]?`)
+
+    new_bubbles := []string{}
+    for _, match := range r.FindAllStringSubmatch(string(b), -1){
+        name := match[2]
+        new_bubbles = append(new_bubbles, name)
+        CheckCreateBubble(name)
+    }
+    return new_bubbles 
 }
 
 // compile list of pages and prepare Globals struct (mostly for filling in the nav bar with pages links)

@@ -1,12 +1,12 @@
 
 <nav class="navbar navbar-default" role="navigation">
   <div class="container-fluid">
-            {{ $subprojs := .SubProjects }}
+            {{ $subprojs := .Globals.SubProjects }}
             <!-- Collect the nav links, forms, and other content for toggling -->
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
               <ul class="nav navbar-nav">
                 <li><a href="/">Home</a></li>
-                {{range $proj := .Projects}}
+                {{range $proj := .Globals.Projects}}
                     {{ $proj0 := index $proj 0}}
                     {{ $sp := index $subprojs $proj0}}
                     {{ if $sp }}

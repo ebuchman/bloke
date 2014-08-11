@@ -21,9 +21,16 @@ import (
 /* TODO
     - add tls support
     - clean up js bubbles so they follow user as they scroll
-    - meta info (pages, posts, bubbles)
-    - add "technical explanation" part to bubbles
+    - add "technical explanation" part to bubbles - + meta info?
     - validate serve assets
+*/
+
+
+/*
+    Global variables
+        - Path variables
+        - Flags
+        - NewBubbleString
 */
 
 // bloke should be launched from the sites root
@@ -36,6 +43,12 @@ var BlokePath = GoPath + "/src/github.com/ebuchman/bloke" // is there a nicer wa
 var InitSite = flag.String("init", "", "path to new site dir")
 var ListenPort = flag.Int("port", 9099, "port to listen for incoming connections")
 var WebHook = flag.Bool("webhook", false, "create a new secret token for use with github webhook")
+var NewBubbles = flag.Bool("bubbles", false, "give all referenced bubbles a markdown file")
+
+var NewBubbleString = "This bubble has not been written yet" // this will be changed to refer you to the github repo once it's configured :)
+
+    // for bubbles that haven't been built yet, init them with this text
+    //new_bubble_text = "This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo!]("+g.Config.Repo+")"
 
 // config struct - corresponds to config.json
 type ConfigType struct{
@@ -45,8 +58,22 @@ type ConfigType struct{
     Repo string `json:"github_repo"`
 }
 
+// meta info struct. read from json
 type MetaInfoType struct {
     Title string `json:"title"`
+}
+
+// this guy gets passed to the go templates. simply has pointers to the globals and the page
+type ViewType struct{
+    Page *PageType
+    Globals *Globals
+}
+
+// info specific to the page requested by a client
+type PageType struct{
+    Text string // text of current page
+    Title string // title of current page
+    MetaInfo MetaInfoType // struct of meta info for current page
 }
 
 // main site struct
@@ -58,12 +85,7 @@ type Globals struct{
     Posts map[string]map[string]map[string][]string // year, month, day, title
     RecentPosts [][]string // [](title, date_name)
 
-    Text string // text of current page
-    Title string // title of current page
-    MetaInfo MetaInfoType // struct of meta info
-
-    Config ConfigType
-
+    Config ConfigType // config struct loaded from config.json
     webhookSecret []byte // secret key for authenticating github webhook requests
 }
 
@@ -77,6 +99,7 @@ type Globals struct{
 */ 
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         log.Println("handle Index", r.URL.Path)
+        page := new(PageType)
         // is URL is empty, serve main page, else validate URL and LoadPage
         if len(r.URL.Path[1:]) > 0{
             path_elements := strings.Split(r.URL.Path[1:], "/")
@@ -87,14 +110,14 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }
             //posts
             if IsPost(path_elements[0]){
-                err := g.LoadPage(path.Join(SiteRoot, "posts"), r.URL.Path[1:])
+                err := page.LoadPage(path.Join(SiteRoot, "posts"), r.URL.Path[1:])
                 if err != nil{
                     g.errorPage(w, err)
                     return
                 }
             //pages
             }else if g.IsPage(r.URL.Path[1:]){
-                err := g.LoadPage(path.Join(SiteRoot, "pages"), r.URL.Path[1:])
+                err := page.LoadPage(path.Join(SiteRoot, "pages"), r.URL.Path[1:])
                 if err != nil{
                     g.errorPage(w, err)
                     return 
@@ -105,13 +128,13 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }
         //home
         } else {
-            err := g.LoadPage(path.Join(SiteRoot, "posts"), g.RecentPosts[0][1])
+            err := page.LoadPage(path.Join(SiteRoot, "posts"), g.RecentPosts[0][1])
             if err != nil{
                 g.errorPage(w, err)
                 return 
             }
         }
-        renderTemplate(w, "page", g)
+        renderTemplate(w, "page", ViewType{Page:page, Globals:g})
 }
 
 // ajax bubble response
@@ -123,7 +146,7 @@ func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
     if err != nil{
         log.Println("error on bubble ", r.URL.Path[1:], err)
     }
-    fmt.Fprintf(w, g.ParseBubbles(b))
+    fmt.Fprintf(w, ParseBubbles(b))
 }
 
 // github webhook response (confirm valid post request, git pull)
@@ -181,6 +204,7 @@ func CheckMAC(message, messageMAC, key []byte) bool {
 }
 
 // if git pull not up to date, refresh Globals
+// how do we pull safely, without messing up a user?!
 func (g *Globals) GitPull(){
      cmd := exec.Command("git", "pull", "origin", "master")
      var out bytes.Buffer
@@ -230,9 +254,10 @@ func servePage(w http.ResponseWriter, r *http.Request){
     }
 }
 
+
 func StartServer(){
     // load config, compile lists of site contents
-    g := Globals{}
+    var g = Globals{}
     g.LoadConfig()
     g.AssembleSite()
 
@@ -261,6 +286,11 @@ func main(){
         os.Exit(0)
     }
 
+    if *NewBubbles{
+        new_bubbles := ParseForNewBubbles()
+        log.Println(new_bubbles)
+        os.Exit(0)
+    }
 
     StartServer()
 }

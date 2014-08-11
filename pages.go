@@ -29,28 +29,28 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
 
 // error function
 func (g *Globals) errorPage(w http.ResponseWriter, err error){
-    g.Title = "Error"
-    g.Text = err.Error()
-    renderTemplate(w, "page", g)
+    page := new(PageType)
+    page.Title = "Error"
+    page.Text = err.Error()
+    renderTemplate(w, "page", ViewType{Page: page, Globals: g})
 }
 
 // load and parse a page and relevent metainfo 
-func (g *Globals) LoadPage(dirPath, name string) error{
+func (page *PageType) LoadPage(dirPath, name string) error{
     // read markdown file
     b, err := ioutil.ReadFile(path.Join(dirPath,name+".md"))
     if err != nil{
         return err
     }
-
-    g.MetaInfo, b = ParseMetaInfo(b)
-    g.Text = g.ParseBubbles(b) 
-
-    if g.MetaInfo.Title == ""{
-        g.Title = GetTitleFromUrl(name)
+    // set meta-info and text
+    page.MetaInfo, b = ParseMetaInfo(b)
+    page.Text = ParseBubbles(b) 
+    // set title
+    if page.MetaInfo.Title == ""{
+        page.Title = GetTitleFromUrl(name)
     }else {
-        g.Title = g.MetaInfo.Title
+        page.Title = page.MetaInfo.Title
     }
-
     return nil
 }
 
@@ -71,25 +71,29 @@ func ParseMetaInfo(s []byte) (MetaInfoType, []byte){
     return m, s
 }
 
+func CheckCreateBubble(name string){
+    _, err := os.Stat(path.Join("bubbles", name+".md"))
+    if err != nil{
+        f, err := os.Create(path.Join("bubbles", name+".md"))
+        if err != nil{
+            log.Println("could not create new bubble file")
+        } else{
+            f.WriteString(NewBubbleString)
+        }
+    }
+}
+
 // parse and replace for bubbles and markdown to js/html
 // takes the raw txt.md bytes
 // creates new bubble entries if they are referenced but don't exist
-func (g *Globals) ParseBubbles(s []byte) string{
+func ParseBubbles(s []byte) string{
     r, _ := regexp.Compile(`\[\[(.+?)\] \[(.+?)\]\]?`)
     s = blackfriday.MarkdownCommon(s)
 
     // get all matches, check if they exist, add them if not...
     for _, match := range r.FindAllStringSubmatch(string(s), -1){
         name := match[2]
-        _, err := os.Stat(path.Join("bubbles", name+".md"))
-        if err != nil{
-            f, err := os.Create(path.Join("bubbles", name+".md"))
-            if err != nil{
-                log.Println("could not create new bubble file")
-            } else{
-                f.WriteString("This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo!]("+g.Config.Repo+")")
-            }
-        }
+        CheckCreateBubble(name)
     }
 
     return r.ReplaceAllString(string(s), `<a href="#/" onClick="get_entry_data('$2')">$1</a>`)
