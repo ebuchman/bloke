@@ -57,6 +57,7 @@ type ConfigType struct{
     Site string `json:"site"`
     Repo string `json:"github_repo"`
     Glossary string `json:"glossary_file"`
+    Disqus string `json:"disqus_user"`
 }
 
 // meta info struct. read from json
@@ -80,6 +81,7 @@ type PageType struct{
 
     // bloke flags (trigger specialized html/templating)
     IsGlossary bool
+    IsDisqus bool
 }
 
 // main site struct

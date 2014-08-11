@@ -301,6 +301,7 @@ func CreateNewSite(){
         } else{
             f.WriteString("\t\"glossary_file\": \"\"\n")
         }
+        f.WriteString("\t\"disqus_user\": \"\"\n")
         f.WriteString("}")
     }
 

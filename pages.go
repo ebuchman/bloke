@@ -55,6 +55,7 @@ func (g *Globals) LoadPage(dirPath, name string, page *PageType) error{
 
     //set flags
     page.IsGlossary = g.Config.Glossary == page.Name
+    page.IsDisqus = g.Config.Disqus != ""
     log.Println(page.IsGlossary)
 
     return nil
