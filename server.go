@@ -19,15 +19,11 @@ import (
 )
 
 /* TODO
-
-    - new bubbles, blank files in /bubbles
-
     - add tls support
     - clean up js bubbles so they follow user as they scroll
     - add "technical explanation" part to bubbles - + meta info?
     - validate serve assets
 */
-
 
 /*
     Global variables
@@ -49,9 +45,6 @@ var WebHook = flag.Bool("webhook", false, "create a new secret token for use wit
 var NewBubbles = flag.Bool("bubbles", false, "give all referenced bubbles a markdown file")
 
 var NewBubbleString = "This bubble has not been written yet" // this will be changed to refer you to the github repo once it's configured :)
-
-    // for bubbles that haven't been built yet, init them with this text
-    //new_bubble_text = 
 
 // config struct - corresponds to config.json
 type ConfigType struct{
@@ -152,12 +145,12 @@ func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
             b = []byte("there was an error reading this bubble")
         }
         if len(b) == 0{
-            fmt.Fprintf(w, NewBubbleString)
+            fmt.Fprintf(w, ParseBubbles([]byte(NewBubbleString)))
         }else {
             fmt.Fprintf(w, ParseBubbles(b))
         }
     } else{
-        fmt.Fprintf(w, NewBubbleString)
+        fmt.Fprintf(w, ParseBubbles([]byte(NewBubbleString)))
     }
 }
 
@@ -301,9 +294,6 @@ func main(){
     if *NewBubbles{
         var g = Globals{}
         g.LoadConfig()
-        if g.Config.Repo != ""{
-            NewBubbleString = "This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo!]("+g.Config.Repo+")"
-        }
         new_bubbles := ParseForNewBubbles()
         WriteSetToFile("empty_bubbles.txt", new_bubbles)
         log.Println(new_bubbles)

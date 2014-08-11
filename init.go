@@ -57,6 +57,9 @@ func (g * Globals) LoadConfig(){
         } else {
             log.Println("\tnothing to do")
         }
+
+        // update new bubble string to point to repo
+        NewBubbleString = "This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo]("+g.Config.Repo+")"
     }
 }
 
