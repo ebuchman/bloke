@@ -19,6 +19,9 @@ import (
 )
 
 /* TODO
+
+    - new bubbles, blank files in /bubbles
+
     - add tls support
     - clean up js bubbles so they follow user as they scroll
     - add "technical explanation" part to bubbles - + meta info?
@@ -138,11 +141,9 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
 }
 
 // ajax bubble response
+// if bubblename.md doesnt exist or is blank, return the NewBubbleString
+// r.URL.Path should be /bubbles/bubble-name
 func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
-    //path_split := strings.Split(r.URL.Path[1:], "/")
-    // path_split [0] should be "bubble"
-    //bubble := path_split[1]
-
     _, err := os.Stat(path.Join(SiteRoot, r.URL.Path[1:]))
     if err == nil{
         b, err := ioutil.ReadFile(path.Join(SiteRoot, r.URL.Path[1:]))
@@ -150,7 +151,11 @@ func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
             log.Println("error on bubble ", r.URL.Path[1:], err)
             b = []byte("there was an error reading this bubble")
         }
-        fmt.Fprintf(w, ParseBubbles(b))
+        if len(b) == 0{
+            fmt.Fprintf(w, NewBubbleString)
+        }else {
+            fmt.Fprintf(w, ParseBubbles(b))
+        }
     } else{
         fmt.Fprintf(w, NewBubbleString)
     }
@@ -300,7 +305,7 @@ func main(){
             NewBubbleString = "This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo!]("+g.Config.Repo+")"
         }
         new_bubbles := ParseForNewBubbles()
-        WriteArrayToFile("empty_bubbles.txt", new_bubbles)
+        WriteSetToFile("empty_bubbles.txt", new_bubbles)
         log.Println(new_bubbles)
         os.Exit(0)
     }

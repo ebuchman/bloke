@@ -86,10 +86,7 @@ func (g *Globals) AssembleSite(){
 func (g *Globals) AssemblePosts(){
     // posts dir should be fill with files like 2014-06-12-Name.md
     // No directories
-    files, err := ioutil.ReadDir(SiteRoot+"/posts")
-    if err != nil {
-        log.Fatal("error reading pages")
-    }
+    files := ReadDir(path.Join(SiteRoot, "posts"))
     for _, f := range files {
         if !f.IsDir(){
            fname := strings.Split(f.Name(), ".")[0]
@@ -97,6 +94,7 @@ func (g *Globals) AssemblePosts(){
            //year := date_name[0]
            //month := date_name[1]
            //day := date_name[2]
+           //TODO: robustify!
            title := date_name[3]
            g.RecentPosts = append(g.RecentPosts, []string{title, fname})
         }
@@ -105,34 +103,23 @@ func (g *Globals) AssemblePosts(){
 }
 
 // search every file for new bubbles, create them, return list of new_bubbles
-func ParseForNewBubbles() []string{
-    new_bubbles := []string{}
+func ParseForNewBubbles() map[string]bool{
+    new_bubbles := make(map[string]bool) // a 'set' type
     folders := []string{"bubbles", "posts", "pages"}
     // compose list of bubbles to make
     for _, folder := range folders{
         // read folder
-        files, err := ioutil.ReadDir(path.Join(SiteRoot, folder))
-        if err != nil{
-            log.Fatal("error reading", folder, err)
-        }   
+        files := ReadDir(path.Join(SiteRoot, folder))
+
         // for each file in folder, parse for new bubbles
         for _, file := range files{
             if !file.IsDir(){
-                bubbles := ParseFileForNewBubbles(path.Join(folder, file.Name()))
-                if len(bubbles) > 0{
-                    new_bubbles = append(new_bubbles, bubbles...)
-                }
+                ParseFileForNewBubbles(path.Join(folder, file.Name()), &new_bubbles)
             } else{
                 // if file is a dir, read dir, for each subfile, parse for new bubbles
-                subfiles, err := ioutil.ReadDir(path.Join(SiteRoot, folder, file.Name()))
-                if err != nil{
-                    log.Fatal("error reading", folder, file, err)
-                }
+                subfiles := ReadDir(path.Join(SiteRoot, folder, file.Name()))
                 for _, subfile := range subfiles{
-                    bubbles := ParseFileForNewBubbles(path.Join(folder, file.Name(), subfile.Name()))
-                    if len(bubbles) > 0{
-                        new_bubbles = append(new_bubbles, bubbles...)
-                    }
+                    ParseFileForNewBubbles(path.Join(folder, file.Name(), subfile.Name()), &new_bubbles)
                 }
             }
         }
@@ -141,23 +128,48 @@ func ParseForNewBubbles() []string{
 }
 
 // Find all bubbles, check against old_bubbles, return new bubbles
-func ParseFileForNewBubbles(pathname string) []string{
+func ParseFileForNewBubbles(pathname string, new_bubbles *map[string]bool) {
     b, err := ioutil.ReadFile(pathname)
     if err != nil{
         log.Println("error reading file", pathname, err)
-        return []string{}
+        return
     }
     r, _ := regexp.Compile(`\[\[(.+?)\] \[(.+?)\]\]?`)
 
-    new_bubbles := []string{}
     for _, match := range r.FindAllStringSubmatch(string(b), -1){
         name := match[2]
+        // if file does not exist, or if file exists but is empty, its a new bubble
         _, err := os.Stat(path.Join("bubbles", name+".md"))
         if err != nil{
-            new_bubbles = append(new_bubbles, name)
+            (*new_bubbles)[name] = true
+            _, err := os.Create(path.Join("bubbles", name+".md"))
+            if err != nil{
+                log.Println("could not create new bubble file")
+            }
+        } else {
+            b, err := ioutil.ReadFile(path.Join("bubbles", name+".md"))
+            if err != nil{
+                log.Println("error reading file", name, err)
+            }
+            if len(b) == 0{
+                (*new_bubbles)[name] = true
+            }
         }
     }
-    return new_bubbles 
+}
+
+func ReadDir(dir string)[] os.FileInfo{
+    files, err := ioutil.ReadDir(dir)
+    if err != nil {
+        log.Fatal("error reading pages")
+    }
+    var return_files []os.FileInfo
+    for _, f := range files{
+        if !strings.HasPrefix(f.Name(), "."){
+            return_files = append(return_files, f)
+        }
+    }
+    return return_files
 }
 
 // compile list of pages and prepare Globals struct (mostly for filling in the nav bar with pages links)
@@ -168,10 +180,7 @@ func (g *Globals) AssemblePages(){
     g.SubProjects = make(map[string][][]string)
 
     // get list of files in pages dir
-    files, err := ioutil.ReadDir(SiteRoot+"/pages")
-    if err != nil {
-        log.Fatal("error reading pages")
-    }
+    files := ReadDir(path.Join(SiteRoot, "pages"))
 
     for _, f := range files {
         // if project is not a directory, attempt get name from meta info
@@ -182,10 +191,8 @@ func (g *Globals) AssemblePages(){
         } else{
             // project is a directory, and has subprojects
             // get name from meta-info.json, or fall back to dirname
-            subfiles, err := ioutil.ReadDir(path.Join(SiteRoot, "pages", f.Name()))
-            if err != nil {
-                log.Fatal("error reading sub pages")
-            }
+            subfiles := ReadDir(path.Join(SiteRoot, "pages", f.Name()))
+
             // go through list of subfiles, get names
             var subproj_list [][]string // list of pairs (urlname, displayname)
             parent := f.Name()
@@ -269,6 +276,7 @@ func CreateNewSite(){
     log.Println("To configure your site, please edit config.json. Then, run bloke. Link up with a github repo anytime!")
 }
 
+// called on bloke --webhook
 func CreateSecretToken(){
     f, err := os.Create(".secret")
     defer f.Close()
@@ -286,14 +294,15 @@ func CreateSecretToken(){
     f.WriteString(secret)
 }
 
-func WriteArrayToFile(filename string, array []string){
+// for writing list of empty bubbles to file
+func WriteSetToFile(filename string, set map[string]bool){
     f, err := os.Create(filename)
     defer f.Close()
     if err != nil{
         log.Println("Could not create new file", err)
     }
-    for _, l := range array{
-        f.WriteString(l+"\n")
+    for k, _ := range set{
+        f.WriteString(k+"\n")
     }
 }
 
