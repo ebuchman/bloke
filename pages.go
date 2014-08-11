@@ -71,7 +71,8 @@ func ParseMetaInfo(s []byte) (MetaInfoType, []byte){
     return m, s
 }
 
-func CheckCreateBubble(name string){
+// check if bubble exists. if not, create, return true
+func CheckCreateBubble(name string) bool{
     _, err := os.Stat(path.Join("bubbles", name+".md"))
     if err != nil{
         f, err := os.Create(path.Join("bubbles", name+".md"))
@@ -80,7 +81,9 @@ func CheckCreateBubble(name string){
         } else{
             f.WriteString(NewBubbleString)
         }
+        return true
     }
+    return false
 }
 
 // parse and replace for bubbles and markdown to js/html

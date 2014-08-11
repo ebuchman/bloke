@@ -48,7 +48,7 @@ var NewBubbles = flag.Bool("bubbles", false, "give all referenced bubbles a mark
 var NewBubbleString = "This bubble has not been written yet" // this will be changed to refer you to the github repo once it's configured :)
 
     // for bubbles that haven't been built yet, init them with this text
-    //new_bubble_text = "This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo!]("+g.Config.Repo+")"
+    //new_bubble_text = 
 
 // config struct - corresponds to config.json
 type ConfigType struct{
@@ -294,7 +294,13 @@ func main(){
     }
 
     if *NewBubbles{
+        var g = Globals{}
+        g.LoadConfig()
+        if g.Config.Repo != ""{
+            NewBubbleString = "This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo!]("+g.Config.Repo+")"
+        }
         new_bubbles := ParseForNewBubbles()
+        WriteArrayToFile("empty_bubbles.txt", new_bubbles)
         log.Println(new_bubbles)
         os.Exit(0)
     }
