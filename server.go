@@ -20,10 +20,12 @@ import (
 )
 
 /* TODO
+    - Glossary/bubbles page
+    - better home/blog definition
+    - pdfs in bubbles?
     - add tls support
     - clean up js bubbles so they follow user as they scroll
     - add "technical explanation" part to bubbles - + meta info?
-    - validate serve assets
 */
 
 /*
@@ -61,6 +63,7 @@ type MetaInfoType struct {
 }
 
 // this guy gets passed to the go templates. simply has pointers to the globals and the page
+// every request sees the same globals, but a different page
 type ViewType struct{
     Page *PageType
     Globals *Globals
@@ -230,22 +233,31 @@ func (g *Globals) Refresh(){
     *g = gg
 }
 
-// serve static files (assets)
-func serveFile(w http.ResponseWriter, r *http.Request){
-    // if img, load from SiteRoot
-    // if js/css, load from BlokePath
-
-    //TODO: better validation
-
-    if !strings.Contains(r.URL.Path, "."){
-        //s.handleIndex(w, r)
-    }else{
+// serve static files (assets: js, css)
+func serveBlokeFile(w http.ResponseWriter, r *http.Request){
+    if strings.Contains(r.URL.Path, "."){
         subs := strings.Split(r.URL.Path, ".")
         ext := subs[len(subs)-1]
         if ext == "js" || ext == "css"{
-            http.ServeFile(w, r, path.Join(BlokePath, r.URL.Path[1:]))
-        }else if ext == "png" || ext == "jpg" || ext == "pdf" {
-            http.ServeFile(w, r, path.Join(SiteRoot, r.URL.Path[1:]))
+            p := path.Join(BlokePath, r.URL.Path[1:])
+            _, err := os.Stat(p)
+            if err == nil{
+                http.ServeFile(w, r, p)
+            }
+        }
+    }
+}
+// serve static files (imgs, files)
+func serveFile(w http.ResponseWriter, r *http.Request){
+    if strings.Contains(r.URL.Path, "."){
+        subs := strings.Split(r.URL.Path, ".")
+        ext := subs[len(subs)-1]
+        if ext == "png" || ext == "jpg" || ext == "pdf" {
+            p := path.Join(SiteRoot, r.URL.Path[1:])
+            _, err := os.Stat(p)
+            if err == nil{
+                http.ServeFile(w, r, p))
+            }
         }
     }
 }
@@ -318,7 +330,7 @@ func StartServer(){
     http.HandleFunc("/", g.handleIndex) // main page (/, /posts, /pages)
     http.HandleFunc("/imgs/", serveFile) // static images (png, jpg)
     http.HandleFunc("/files/", serveFile) // static documents (pdfs)
-    http.HandleFunc("/assets/", serveFile) // static js, css files
+    http.HandleFunc("/assets/", serveBlokeFile) // static js, css files
     http.HandleFunc("/bubbles/", g.ajaxResponse) // async bubbles
     http.HandleFunc("/git/", g.gitResponse) // github webhook
 
