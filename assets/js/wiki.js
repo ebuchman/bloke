@@ -117,5 +117,3 @@ function _load_all_bubbles(xmlhttp){
     }
 }
 
-
-
