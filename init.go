@@ -3,6 +3,7 @@ package main
 import (
     "strings"
     "log"
+    "fmt"
     "io/ioutil"
     "os"
     "os/exec"
@@ -79,6 +80,7 @@ func (g *Globals) LoadSecret(){
 
 // main server startup function
 // compile lists of pages and posts and prepare globals struct
+// require at least one page and one post!
 func (g *Globals) AssembleSite(){
     // go through pages and posts and entries
     //RenderTemplateToFile("page", "main", g)
@@ -104,6 +106,9 @@ func (g *Globals) AssemblePosts(){
            title := date_name[3]
            g.RecentPosts = append(g.RecentPosts, []string{title, fname})
         }
+    }
+    if len(g.RecentPosts) == 0{
+        log.Fatal("Sorry, you must have at least one post in the posts/ directory.\nYou MUST use a name like posts/2014-05-06-postname.md and a valid date")
     }
 
 }
@@ -224,6 +229,9 @@ func (g *Globals) AssemblePages(){
             g.SubProjects[f.Name()] = subproj_list
         }
     }
+    if len(g.Projects) == 0{
+        log.Fatal("Sorry, you must have at least one project page in the pages/ directory")
+    }
 }
 
 // open a file, parse metainfo, return title
@@ -258,12 +266,13 @@ func CheckFatal(err error){
 // called on `bloke --init _InitSite`
 func CreateNewSite(){
     // create main folder
-    CheckFatal(os.Mkdir(*InitSite, 0777))// apparently 6s aren't sufficient here?
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "bubbles"), 0666))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "imgs"), 0666))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "files"), 0666))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "pages"), 0666))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "posts"), 0666))
+    mode := os.FileMode(0777) // this should be better but so far I dont understand it :(
+    CheckFatal(os.Mkdir(*InitSite, mode))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "bubbles"), mode))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "imgs"), mode))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "files"), mode))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "pages"), mode))
+    CheckFatal(os.Mkdir(path.Join(*InitSite, "posts"), mode))
 
     // create glossary page
     f, err := os.Create(path.Join(*InitSite, "pages", "Glossary.md"))
@@ -304,9 +313,14 @@ func CreateNewSite(){
         f.WriteString("\t\"disqus_user\": \"\"\n")
         f.WriteString("}")
     }
-
-    log.Println("Your site has been created!")
-    log.Println("To configure your site, please edit config.json. Then, run bloke. Link up with a github repo anytime!")
+    fmt.Println("###################################")
+    fmt.Println("Congratulations, your bloke has been created!")
+    fmt.Println("To configure your bloke, please edit config.json.")
+    fmt.Println("You must have at least one page and one post before Bloke will run")
+    fmt.Println("You probably want to put an image file called logo.png in the imgs/ directory")
+    fmt.Println("Link up with a github repo and the disqus commenting system anytime by adding the respective details in config.json (see readme for more details")
+    fmt.Println("To launch the site, simply run `bloke` from the site's root directory. The site is live in your browser at `localhost:9099`")
+    fmt.Println("###################################")
 }
 
 // called on bloke --webhook
