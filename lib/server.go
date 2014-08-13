@@ -6,7 +6,7 @@ import (
     "log"
     "os"
     "path"
-    "strconv"
+    "io/ioutil"
     "github.com/howeyc/fsnotify"
 )
 
@@ -14,7 +14,7 @@ import (
     - Glossary/bubbles page
     - better home/blog definition
     - pdfs in bubbles?
-    - add tls support
+    - add tls redirects
     - clean up js bubbles so they follow user as they scroll
     - add "technical explanation" part to bubbles - + meta info?
 */
@@ -181,19 +181,28 @@ func ApplyRouting(mux *http.ServeMux, g *Globals){
     mux.HandleFunc("/git/", g.gitResponse) // github webhook
 }
 
-// standalone server for running your own bloke
-func StartServer(ListenPort int, SiteRoot string) {
-    g := LiveBloke(SiteRoot)
-    addr := ":"+strconv.Itoa(ListenPort)
-    http.ListenAndServe(addr, g.mux)
-
-    /* this is really just http.LIstenAndServe(addr, mux)
-    server := &http.Server{Addr: addr, Handler: g.mux}
-    ln, err := net.Listen("tcp", addr)
-    if err != nil{
-        log.Fatal("failed to start listener", err)
+// start a http or https server listening on addr routing with the mux
+func StartServer(addr string, mux *http.ServeMux, tls bool){
+    if tls{
+        _, err := ioutil.ReadDir("certs")
+        if err != nil{
+            log.Fatal("could not find certs dir", err)
+        }
+        err = http.ListenAndServeTLS(addr, "certs/ssl.crt", "certs/ssl.key", mux)
+        if err != nil{
+            log.Println("err on tls", err)
+        }
+    } else{
+        err := http.ListenAndServe(addr,  mux)
+        if err != nil{
+            log.Println("err on http server", err)
+        }
     }
-    server.Serve(ln.(*net.TCPListener)) // in go src: srv.Serve(tcpKeepAliveListener{ln.(*net.TCPListener)})
-    */
+}
+
+// standalone server for running your own bloke
+func StartBloke(addr, SiteRoot string, tls bool) {
+    g := LiveBloke(SiteRoot)
+    StartServer(addr, g.mux, tls)
 }
 

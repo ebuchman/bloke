@@ -2,6 +2,8 @@ package bloke
 
 import (
     "log"
+    "path"
+    "os"
     "os/exec"
     "bytes"
     "strings"
@@ -31,3 +33,15 @@ func (g *Globals) GitPull(){
         g.Refresh()
      }
 }
+
+// check if given dir is a bloke
+func IsBloke(pathname string) bool{
+    _, err := os.Stat(path.Join(pathname, ".isbloke"))
+    if err != nil{
+        return false
+    }
+    return true
+}
+
+
+

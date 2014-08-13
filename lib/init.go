@@ -339,6 +339,11 @@ func CreateNewSite(InitSite string){
         f.WriteString("}")
     }
     f.Close()
+
+    _, err = os.Create(path.Join(InitSite, ".isbloke"))
+    if err != nil{
+        log.Println("could not init as bloke site. weird")
+    }
 }
 
 // called on bloke --webhook

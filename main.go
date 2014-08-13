@@ -10,6 +10,7 @@ import (
     "strconv"
     "net/http"
     "io/ioutil"
+    "path"
 )
 
 /*
@@ -45,6 +46,7 @@ func main(){
     var WebHook = flag.Bool("webhook", false, "create a new secret token for use with github webhook")
     var NewBubbles = flag.Bool("bubbles", false, "give all referenced bubbles a markdown file")
     var Host = flag.Bool("host", false, "host multiple blokes")
+    var SSLEnable = flag.Bool("ssl", false, "enable ssl/tls (https)") 
 
     flag.Parse()
 
@@ -76,6 +78,9 @@ func main(){
         os.Exit(0)
     }
 
+    // listening address
+    addr := ":"+strconv.Itoa(*ListenPort)
+
     // host all blokes in this dir
     if *Host{
         // get all blokes in this dir
@@ -85,7 +90,7 @@ func main(){
         }
         blokes := []string{}
         for _, f := range files{
-            if f.IsDir() { // should also ensure it's actually a bloke dir
+            if f.IsDir() && bloke.IsBloke(path.Join(SiteRoot, f.Name())){ // should also ensure it's actually a bloke dir
                 blokes = append(blokes, f.Name())
             }
         }
@@ -97,10 +102,9 @@ func main(){
         // start server
         mux := http.NewServeMux()
         mux.HandleFunc("/", h.hostHandler)
-        addr := ":"+strconv.Itoa(*ListenPort)
-        http.ListenAndServe(addr, mux)
+        bloke.StartServer(addr, mux, *SSLEnable)
     } else {
         // host standalone bloke
-        bloke.StartServer(*ListenPort, SiteRoot)
+        bloke.StartBloke(addr, SiteRoot, *SSLEnable)
     }
 }
