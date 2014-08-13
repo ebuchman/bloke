@@ -1,9 +1,9 @@
-package main
+package bloke
 
 import (
     "strings"
+    "strconv"
     "log"
-    "fmt"
     "io/ioutil"
     "os"
     "os/exec"
@@ -13,17 +13,31 @@ import (
     "crypto/rand"
     "bytes"
     "regexp"
+    "time"
 )
 
+// config struct - corresponds to config.json
+type ConfigType struct{
+    SiteName string `json:"site_name"`
+    Email string `json:"email"`
+    Site string `json:"site"`
+    Repo string `json:"github_repo"`
+    Glossary string `json:"glossary_file"`
+    Disqus string `json:"disqus_user"`
+}
+
 // load config struct from config.json
-func (g * Globals) LoadConfig(){
-    file, e := ioutil.ReadFile(path.Join(SiteRoot, "config.json"))
+func (g * Globals) LoadConfig(SiteRoot string){
+    g.SiteRoot = SiteRoot
+    file, e := ioutil.ReadFile(path.Join(g.SiteRoot, "config.json"))
     if e != nil{
         log.Fatal("no config", e)
     }
     var c ConfigType
     json.Unmarshal(file, &c)
     g.Config = c
+
+    g.Close = make(chan bool)
 
     // sync with git repo first time
     if g.Config.Repo != ""{
@@ -69,7 +83,7 @@ func (g * Globals) LoadConfig(){
 
 // load webhooks secret from file
 func (g *Globals) LoadSecret(){
-    b, e := ioutil.ReadFile(path.Join(SiteRoot, ".secret"))
+    b, e := ioutil.ReadFile(path.Join(g.SiteRoot, ".secret"))
     if e != nil{
         log.Println("no secret, github webhooks not enabled")
         g.webhookSecret = []byte("")
@@ -94,7 +108,7 @@ func (g *Globals) AssembleSite(){
 func (g *Globals) AssemblePosts(){
     // posts dir should be fill with files like 2014-06-12-Name.md
     // No directories
-    files := ReadDir(path.Join(SiteRoot, "posts"))
+    files := ReadDir(path.Join(g.SiteRoot, "posts"))
     for _, f := range files {
         if !f.IsDir(){
            fname := strings.Split(f.Name(), ".")[0]
@@ -114,7 +128,7 @@ func (g *Globals) AssemblePosts(){
 }
 
 // search every file for new bubbles, create them, return list of new_bubbles
-func ParseForNewBubbles() map[string]bool{
+func ParseForNewBubbles(SiteRoot string) map[string]bool{
     new_bubbles := make(map[string]bool) // a 'set' type
     folders := []string{"bubbles", "posts", "pages"}
     // compose list of bubbles to make
@@ -192,7 +206,7 @@ func (g *Globals) AssemblePages(){
     g.SubProjects = make(map[string][][]string)
 
     // get list of files in pages dir
-    files := ReadDir(path.Join(SiteRoot, "pages"))
+    files := ReadDir(path.Join(g.SiteRoot, "pages"))
 
     for _, f := range files {
         // if project is not a directory, attempt get name from meta info
@@ -203,14 +217,14 @@ func (g *Globals) AssemblePages(){
         } else{
             // project is a directory, and has subprojects
             // get name from meta-info.json, or fall back to dirname
-            subfiles := ReadDir(path.Join(SiteRoot, "pages", f.Name()))
+            subfiles := ReadDir(path.Join(g.SiteRoot, "pages", f.Name()))
 
             // go through list of subfiles, get names
             var subproj_list [][]string // list of pairs (urlname, displayname)
             parent := f.Name()
             for _, ff := range subfiles{
                 url_name := strings.Split(ff.Name(), ".")[0]
-                display_name := GetTitleFromMetaInfo(path.Join(SiteRoot, "pages", parent), url_name)
+                display_name := GetTitleFromMetaInfo(path.Join(g.SiteRoot, "pages", parent), url_name)
                 subproj_list = append(subproj_list, []string{url_name, display_name})
             }
 
@@ -264,18 +278,18 @@ func CheckFatal(err error){
 }
 
 // called on `bloke --init _InitSite`
-func CreateNewSite(){
+func CreateNewSite(InitSite string){
     // create main folder
     mode := os.FileMode(0777) // this should be better but so far I dont understand it :(
-    CheckFatal(os.Mkdir(*InitSite, mode))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "bubbles"), mode))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "imgs"), mode))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "files"), mode))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "pages"), mode))
-    CheckFatal(os.Mkdir(path.Join(*InitSite, "posts"), mode))
+    CheckFatal(os.Mkdir(InitSite, mode))
+    CheckFatal(os.Mkdir(path.Join(InitSite, "bubbles"), mode))
+    CheckFatal(os.Mkdir(path.Join(InitSite, "imgs"), mode))
+    CheckFatal(os.Mkdir(path.Join(InitSite, "files"), mode))
+    CheckFatal(os.Mkdir(path.Join(InitSite, "pages"), mode))
+    CheckFatal(os.Mkdir(path.Join(InitSite, "posts"), mode))
 
     // create glossary page
-    f, err := os.Create(path.Join(*InitSite, "pages", "Glossary.md"))
+    f, err := os.Create(path.Join(InitSite, "pages", "Glossary.md"))
     gloss_success := false
     if err != nil{
      log.Println("Could not create glossary file:", err)
@@ -285,14 +299,25 @@ func CreateNewSite(){
     }
     f.Close()
 
+    // create first post
+    yy, mm, dd := time.Now().Date()
+    postname := strconv.Itoa(int(yy))+"-"+strconv.Itoa(int(mm))+"-"+strconv.Itoa(int(dd))+"-FirstPost.md"
+    f, err = os.Create(path.Join(InitSite, "posts", postname))
+    if err != nil{
+     log.Println("Could not create first post file:", err)
+    }else{
+        f.WriteString("Welcome to your new bloke!")
+    }
+    f.Close()
+
     // create and initialize config file
-    f, err = os.Create(path.Join(*InitSite, "config.json"))
+    f, err = os.Create(path.Join(InitSite, "config.json"))
     defer f.Close()
     if err != nil{
      log.Println("Could not create config file:", err)
     }else{
         /*
-        c := ConfigType{SiteName: *InitSite}
+        c := ConfigType{SiteName: InitSite}
         jc, _ := json.Marshal(c)
         enc := json.NewEncoder(f)
         err := enc.Encode(jc)
@@ -301,7 +326,7 @@ func CreateNewSite(){
         }
         */ // why can't I write a clean config file?
         f.WriteString("{\n")
-        f.WriteString("\t\"site_name\": \""+*InitSite+"\",\n")
+        f.WriteString("\t\"site_name\": \""+InitSite+"\",\n")
         f.WriteString("\t\"email\": \"\",\n")
         f.WriteString("\t\"site\": \"\",\n")
         f.WriteString("\t\"github_repo\": \"\"\n")
@@ -313,14 +338,7 @@ func CreateNewSite(){
         f.WriteString("\t\"disqus_user\": \"\"\n")
         f.WriteString("}")
     }
-    fmt.Println("###################################")
-    fmt.Println("Congratulations, your bloke has been created!")
-    fmt.Println("To configure your bloke, please edit config.json.")
-    fmt.Println("You must have at least one page and one post before Bloke will run")
-    fmt.Println("You probably want to put an image file called logo.png in the imgs/ directory")
-    fmt.Println("Link up with a github repo and the disqus commenting system anytime by adding the respective details in config.json (see readme for more details")
-    fmt.Println("To launch the site, simply run `bloke` from the site's root directory. The site is live in your browser at `localhost:9099`")
-    fmt.Println("###################################")
+    f.Close()
 }
 
 // called on bloke --webhook
