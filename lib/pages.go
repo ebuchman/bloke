@@ -1,4 +1,4 @@
-package main 
+package bloke
 
 import (
     "github.com/russross/blackfriday" // parsing markdown
@@ -13,6 +13,23 @@ import (
     "strconv"
     "encoding/json"
 )
+
+// meta info struct. read from json
+type MetaInfoType struct {
+    Title string `json:"title"`
+}
+
+// info specific to the page requested by a client
+type pageType struct{
+    Name string //URL name of this page
+    Text string // text of current page
+    Title string // title of current page
+    MetaInfo MetaInfoType // struct of meta info for current page
+
+    // bloke flags (trigger specialized html/templating)
+    IsGlossary bool
+    IsDisqus bool
+}
 
 
 //parse template files
@@ -29,14 +46,14 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
 
 // error function
 func (g *Globals) errorPage(w http.ResponseWriter, err error){
-    page := new(PageType)
+    page := new(pageType)
     page.Title = "Error"
     page.Text = err.Error()
-    renderTemplate(w, "page", ViewType{Page: page, Globals: g})
+    renderTemplate(w, "page", viewType{Page: page, Globals: g})
 }
 
 // load and parse a page and relevent metainfo 
-func (g *Globals) LoadPage(dirPath, name string, page *PageType) error{
+func (g *Globals) LoadPage(dirPath, name string, page *pageType) error{
     // read markdown file
     b, err := ioutil.ReadFile(path.Join(dirPath,name+".md"))
     if err != nil{
@@ -63,7 +80,7 @@ func (g *Globals) LoadPage(dirPath, name string, page *PageType) error{
 
 // load bubble, parse text, return html string
 // will need an upgrade to json for metainfo...
-func LoadBubble(name string) string{
+func LoadBubble(SiteRoot, name string) string{
     _, err := os.Stat(path.Join(SiteRoot, name))
     bubble_content := ""
     if err == nil{
@@ -111,7 +128,7 @@ func ParseBubbles(s []byte) string{
 
 
 
-func RenderTemplateToFile(tmpl, save_file string, p interface{}){
+func RenderTemplateToFile(tmpl, SiteRoot, save_file string, p interface{}){
     //we already parsed the html templates
     f, err := os.Create(SiteRoot+"/sites/"+save_file+".html")
     if err != nil{
