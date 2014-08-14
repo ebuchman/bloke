@@ -1,4 +1,4 @@
-package bloke
+package main
 
 import (
     "flag"
@@ -10,6 +10,7 @@ import (
     "net/http"
     "io/ioutil"
     "path"
+    "github.com/ebuchman/bloke/bloke"
 )
 
 /*
@@ -24,8 +25,8 @@ var WILDCARD = false
 // host multiple blokes
 type Hoster struct{
     mydomain string
-    subdomains map[string]Globals // map to blokes registered with us
-    domains map[string]Globals // map to blokes with their own domain name
+    subdomains map[string]bloke.Globals // map to blokes registered with us
+    domains map[string]bloke.Globals // map to blokes with their own domain name
     //mux *http.ServeMux
 }
 
@@ -33,8 +34,8 @@ type Hoster struct{
 func NewHoster(domainName string) *Hoster{
     h := new(Hoster)
     h.mydomain = domainName
-    h.subdomains = make(map[string]Globals)
-    h.domains = make(map[string]Globals)
+    h.subdomains = make(map[string]bloke.Globals)
+    h.domains = make(map[string]bloke.Globals)
     return h
 }
 
@@ -135,7 +136,7 @@ func main(){
     SiteRoot := "."
     
     if *InitSite != ""{
-        CreateNewSite(*InitSite)
+        bloke.CreateNewSite(*InitSite)
         fmt.Println("###################################")
         fmt.Println("Congratulations, your bloke has been created!")
         fmt.Println("To configure your bloke, please edit config.json.")
@@ -147,15 +148,15 @@ func main(){
     }
   
     if *WebHook{
-        CreateSecretToken()
+        bloke.CreateSecretToken()
         os.Exit(0)
     }
 
     if *NewBubbles{
-        var g = Globals{}
+        var g = bloke.Globals{}
         g.LoadConfig(SiteRoot)
-        new_bubbles := ParseForNewBubbles(g.SiteRoot)
-        WriteSetToFile("empty_bubbles.txt", new_bubbles)
+        new_bubbles := bloke.ParseForNewBubbles(g.SiteRoot)
+        bloke.WriteSetToFile("empty_bubbles.txt", new_bubbles)
         log.Println(new_bubbles)
         os.Exit(0)
     }
@@ -172,7 +173,7 @@ func main(){
         }
         blokes := []string{}
         for _, f := range files{
-            if f.IsDir() && IsBloke(path.Join(SiteRoot, f.Name())){ // should also ensure it's actually a bloke dir
+            if f.IsDir() && bloke.IsBloke(path.Join(SiteRoot, f.Name())){ // should also ensure it's actually a bloke dir
                 blokes = append(blokes, f.Name())
             }
         }
@@ -181,7 +182,7 @@ func main(){
         // for now these are all subdomains
         // no hosting for custom domain names yet...
         for _, blokeName := range blokes{
-            h.subdomains[blokeName] = LiveBloke(blokeName)
+            h.subdomains[blokeName] = bloke.LiveBloke(blokeName)
         }   
         log.Println("blokes:", h)
         if *SSLEnable{
@@ -190,18 +191,18 @@ func main(){
             // http (only our page is ssl until we get a wildcard)
             mux := http.NewServeMux()
             mux.HandleFunc("/", h.hostHTTPHandler)
-            go StartServer(":80", mux, false)
+            go bloke.StartServer(":80", mux, false)
         }
         // start server
         mux := http.NewServeMux()
         mux.HandleFunc("/", h.hostHandler)
-        StartServer(addr, mux, *SSLEnable)
+        bloke.StartServer(addr, mux, *SSLEnable)
     } else {
         // host standalone bloke
         if *SSLEnable{
             // run a server on 80 to redirect all traffic to 443
-            go RedirectServer() 
+            go bloke.RedirectServer() 
         }
-        StartBloke(addr, SiteRoot, *SSLEnable)
+        bloke.StartBloke(addr, SiteRoot, *SSLEnable)
     }
 }
