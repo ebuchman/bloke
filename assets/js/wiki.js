@@ -72,7 +72,7 @@ function displaySearchResults(keystrokes){
 // bubble functions
 
 function new_bubble(name, content, pos){
-    var proto = document.getElementById('entry_div_box_proto').cloneNode(true);
+    var proto = document.getElementById('bupbles').cloneNode(true);
     proto.getElementsByClassName('entry_content_box')[0].innerHTML = content;
 	
 //    MathJax.Hub.Typeset(proto);
