@@ -181,6 +181,19 @@ func ApplyRouting(mux *http.ServeMux, g *Globals){
     mux.HandleFunc("/git/", g.gitResponse) // github webhook
 }
 
+func RedirectTLS(w http.ResponseWriter, r *http.Request){
+    host := r.Host
+    log.Println("https://"+host)
+    http.Redirect(w, r, "https://"+host, 301)
+}
+
+func RedirectServer(){
+    mux := http.NewServeMux()
+    mux.HandleFunc("/", RedirectTLS)
+    http.ListenAndServe(":80", mux)
+}
+
+
 // start a http or https server listening on addr routing with the mux
 func StartServer(addr string, mux *http.ServeMux, tls bool){
     if tls{
