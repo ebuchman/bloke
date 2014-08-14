@@ -6,7 +6,7 @@ import (
     "fmt"
     "os"
     "strconv"
-    "github.com/ebuchman/bloke/bloke"
+    "github.com/ebuchman/bloke"
 )
 
 /*

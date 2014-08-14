@@ -41,7 +41,12 @@ func (g * Globals) LoadConfig(SiteRoot string){
 
     // sync with git repo first time
     if g.Config.Repo != ""{
-        log.Println("Iniitializing git repo and syncing with github remote...")
+        log.Println("Iniitializing git repo and syncing with github remote", g.Config.Repo)
+
+        //change into bloke's dir
+        current, _ := os.Getwd()
+        os.Chdir(SiteRoot)
+
         // initialize as git repo
         _, err := os.Stat(".git")
         if err != nil{
@@ -78,6 +83,9 @@ func (g * Globals) LoadConfig(SiteRoot string){
 
         // update new bubble string to point to repo
         NewBubbleString = "This bubble hasn't been written yet! You can help us write it by submitting issues or pull requests at [our github repo]("+g.Config.Repo+")"
+
+        // change back 
+        os.Chdir(current)
     }
 }
 
@@ -329,13 +337,13 @@ func CreateNewSite(InitSite string){
         f.WriteString("\t\"site_name\": \""+InitSite+"\",\n")
         f.WriteString("\t\"email\": \"\",\n")
         f.WriteString("\t\"site\": \"\",\n")
-        f.WriteString("\t\"github_repo\": \"\"\n")
+        f.WriteString("\t\"github_repo\": \"\",\n")
         if gloss_success{
-            f.WriteString("\t\"glossary_file\": \"Glossary.md\"\n")
+            f.WriteString("\t\"glossary_file\": \"Glossary.md\",\n")
         } else{
-            f.WriteString("\t\"glossary_file\": \"\"\n")
+            f.WriteString("\t\"glossary_file\": \"\",\n")
         }
-        f.WriteString("\t\"disqus_user\": \"\"\n")
+        f.WriteString("\t\"disqus_user\": \"\",\n")
         f.WriteString("}")
     }
     f.Close()
