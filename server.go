@@ -173,11 +173,12 @@ func (g *Globals) NewWatcher(SiteRoot string){
 
 // apply a set of routing rules to a mux using a bloke globals struct
 func ApplyRouting(mux *http.ServeMux, g *Globals){
-    mux.HandleFunc("/", g.handleIndex) // main page (/, /posts, /pages)
+    mux.HandleFunc("/", g.handleIndex) // main page (/, /postname, /pagename)
     mux.HandleFunc("/imgs/", g.serveFile) // static images (png, jpg)
     mux.HandleFunc("/files/", g.serveFile) // static documents (pdfs)
     mux.HandleFunc("/assets/", serveBlokeFile) // static js, css files
-    mux.HandleFunc("/bubbles/", g.ajaxResponse) // async bubbles
+    mux.HandleFunc("/bubbles/", g.ajaxBubbleResponse) // async bubbles
+    mux.HandleFunc("/pages/", g.ajaxPagesResponse) // async page loads
     mux.HandleFunc("/git/", g.gitResponse) // github webhook
 }
 

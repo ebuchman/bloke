@@ -55,6 +55,7 @@ func (g *Globals) errorPage(w http.ResponseWriter, err error){
 // load and parse a page and relevent metainfo 
 func (g *Globals) LoadPage(dirPath, name string, page *pageType) error{
     // read markdown file
+    log.Println(path.Join(dirPath, name+".md"))
     b, err := ioutil.ReadFile(path.Join(dirPath,name+".md"))
     if err != nil{
         return err
@@ -81,10 +82,10 @@ func (g *Globals) LoadPage(dirPath, name string, page *pageType) error{
 // load bubble, parse text, return html string
 // will need an upgrade to json for metainfo...
 func LoadBubble(SiteRoot, name string) string{
-    _, err := os.Stat(path.Join(SiteRoot, name))
+    _, err := os.Stat(path.Join(SiteRoot, name+".md"))
     bubble_content := ""
     if err == nil{
-        b, err := ioutil.ReadFile(path.Join(SiteRoot, name))
+        b, err := ioutil.ReadFile(path.Join(SiteRoot, name+".md"))
         if err != nil{
             log.Println("error on bubble ", name, err)
             b = []byte("there was an error reading this bubble")

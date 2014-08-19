@@ -69,24 +69,30 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         renderTemplate(w, "page", viewType{Page:page, Globals:g})
 }
 
-type AjaxResponseType struct{
-    Bubbles [][]string `json:"bubbles"`
+type Bubble struct{
+    Title string `json:"title"`
+    Content string `json:"content"`
+}
+
+type AjaxBubbleResponseType struct{
+    Bubbles []Bubble `json:"bubbles"`
 }
 
 // ajax bubble response
 // if bubblename.md doesnt exist or is blank, return the NewBubbleString
 // r.URL.Path should be /bubbles/bubble-name or just /bubbles/ to return all entries
-func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
+func (g *Globals) ajaxBubbleResponse(w http.ResponseWriter, r *http.Request){
     split := strings.Split(r.URL.Path[1:], "/")
     log.Println(split)
-    response := AjaxResponseType{[][]string{}}
+    response := AjaxBubbleResponseType{[]Bubble{}}
     if len(split) > 1 && split[1] != ""{
         // TODO: assert length is 2, file name. this should probably be in the post request not url...
         log.Println("this is a single bubble")
         // if the url came with a name, return that bubble
         // maybe we should pass the name in a post request instead of url?
+        name := split[1]
         bubble_content := LoadBubble(g.SiteRoot, r.URL.Path[1:])
-        response.Bubbles = append(response.Bubbles, []string{split[1], bubble_content})
+        response.Bubbles = append(response.Bubbles, Bubble{Title:name, Content:bubble_content})
     } else {
     // else, return all bubbles
     log.Println("all bubbles")
@@ -98,7 +104,7 @@ func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
         for _, f := range files{
             name := f.Name()
             bubble_content := LoadBubble(g.SiteRoot, path.Join("bubbles", name))
-            response.Bubbles = append(response.Bubbles, []string{name, bubble_content})
+            response.Bubbles = append(response.Bubbles, Bubble{name, bubble_content})
         }
     }
     b, err := json.Marshal(response)
@@ -106,6 +112,28 @@ func (g *Globals) ajaxResponse(w http.ResponseWriter, r *http.Request){
         log.Println("could not marshal response to json", err)
     }
     fmt.Fprintf(w, string(b))
+}
+
+func (g *Globals) ajaxPagesResponse(w http.ResponseWriter, r *http.Request){
+    split := strings.Split(r.URL.Path[1:], "/")
+    log.Println(split)
+    page := new(pageType)
+    if len(split) > 1 && split[1] != ""{
+        err := g.LoadPage(g.SiteRoot, r.URL.Path[1:], page)
+        if err != nil{
+            log.Println("error reading page request")
+            return 
+        }
+    } else {
+        log.Println("error reading page request")
+        return 
+    }
+    b, err := json.Marshal(page)
+    if err != nil{
+        log.Println("could not marshal response to json", err)
+    }
+    fmt.Fprintf(w, string(b))
+    
 }
 
 // github webhook response (confirm valid post request, git pull)

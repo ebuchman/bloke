@@ -41,7 +41,14 @@ function get_entry_data(name, inplace){
 
     xmlhttp = new_request_obj();
     request_callback(xmlhttp, _get_entry_data, [name, inplace, document.documentElement.scrollTop]);
-    make_request(xmlhttp, "POST", "/bubbles/"+name+".md", true, {"form":"load_content", "name":name});
+    make_request(xmlhttp, "POST", "/bubbles/"+name, true, {"form":"load_content", "name":name});
+    return false;
+}
+
+function get_page_data(page){
+    xmlhttp = new_request_obj();
+    request_callback(xmlhttp, _get_page_data, [page]);
+    make_request(xmlhttp, "POST", "/pages/"+page, true, {"form":"load_content", "name":page});
     return false;
 }
 
@@ -100,20 +107,31 @@ function close_bubble(id){
  document.getElementById(id).remove();
 }
 
+// replace page
+function replace_page(name, content){
+    document.getElementById("main-title").innerHTML = name;
+    document.getElementById("main-text").innerHTML = content;
+}
+
 // callback
 
 function _get_entry_data(xmlhttp, name, inplace, pos){
-	//var content = xmlhttp.responseText; //JSON.parse(xmlhttp.responseText);
     var response = JSON.parse(xmlhttp.responseText);
-    content = response.bubbles[0][1];
+    content = response.bubbles[0].content;
     new_bubble(name, content, pos);
+}
+
+function _get_page_data(xmlhttp, pagename){
+    var response = JSON.parse(xmlhttp.responseText);
+    content = response.Text;
+    replace_page(response.Title, content);
 }
 
 function _load_all_bubbles(xmlhttp){ 
 	var response = JSON.parse(xmlhttp.responseText);
     var bubbles = response.bubbles;
     for (var i=0 ; i < bubbles.length; i++){
-        new_bubble(bubbles[i][0], bubbles[i][1], 0)
+        new_bubble(bubbles[i].name, bubbles[i].content, 0)
     }
 }
 

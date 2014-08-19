@@ -14,13 +14,13 @@
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">{{index $proj 1}}<span class="caret"></span></a>
                           <ul class="dropdown-menu" role="menu">
                             {{ range $s := $sp }} 
-                            <li><a href="/{{index $proj 0}}/{{index $s 0}}">{{index $s 1}}</a></li>
+                            <li><a href="#/" onClick="get_page_data('{{index $proj 0}}/{{index $s 0}})'">{{index $s 1}}</a></li>
                                 <li class="divider"></li>
                             {{ end }}
                           </ul>
                         </li>
                     {{ else }}
-                        <li><a href="/{{index $proj 0}}">{{index $proj 1}}</a></li>
+                        <li><a href="#/" onClick="get_page_data('{{index $proj 0}}')">{{index $proj 1}}</a></li>
                     {{ end }}
                 {{ end }} 
 
