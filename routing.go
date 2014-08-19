@@ -79,7 +79,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
                 return 
             }
         }
-        renderTemplate(w, "page", viewType{Page:page, Globals:g})
+        g.renderTemplate(w, "page", viewType{Page:page, Globals:g})
 }
 
 type Bubble struct{

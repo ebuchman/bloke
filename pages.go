@@ -3,7 +3,6 @@ package bloke
 import (
     "github.com/russross/blackfriday" // parsing markdown
     "net/http"
-    "text/template"
     "log"
     "os"
     "regexp"
@@ -32,13 +31,10 @@ type pageType struct{
 }
 
 
-//parse template files
-var templates = template.Must(template.ParseFiles(BlokePath+"/views/page.html", BlokePath+"/views/nav.html", BlokePath+"/views/footer.html", BlokePath+"/views/bubbles.html"))
-
 // bring a template to life!
-func renderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
+func (g *Globals) renderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
     //we already parsed the html templates
-    err := templates.ExecuteTemplate(w, tmpl+".html", p)
+    err := g.Templates.ExecuteTemplate(w, tmpl+".html", p)
     if err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
     }
@@ -49,7 +45,7 @@ func (g *Globals) errorPage(w http.ResponseWriter, err error){
     page := new(pageType)
     page.Title = "Error"
     page.Text = err.Error()
-    renderTemplate(w, "page", viewType{Page: page, Globals: g})
+    g.renderTemplate(w, "page", viewType{Page: page, Globals: g})
 }
 
 // load and parse a page and relevent metainfo 
@@ -139,7 +135,7 @@ func (g *Globals) SaveSite(){
         if _, ok := g.SubProjects[name]; !ok{
             page := new(pageType)
             CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "pages"), name, page))
-            RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages"), name, viewType{page, g})
+            g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages"), name, viewType{page, g})
         } else{
             // deal with subprojects!
             subprojs := g.SubProjects[name]
@@ -148,7 +144,7 @@ func (g *Globals) SaveSite(){
                 page := new(pageType)
                 CheckFatal(os.MkdirAll(path.Join(g.SiteRoot, "_site", "pages", name), 0777))
                 CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "pages", name), sp_name, page))
-                RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages", name), sp_name, viewType{page, g})
+                g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages", name), sp_name, viewType{page, g})
             }
 
         }
@@ -163,7 +159,7 @@ func (g *Globals) SaveSite(){
                     name := y+"-"+m+"-"+d+"-"+t
                     page := new(pageType)
                     CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "posts"), name, page)) 
-                    RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "posts"), name, viewType{page, g})
+                    g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "posts"), name, viewType{page, g})
                 }
             }
         }
@@ -173,13 +169,13 @@ func (g *Globals) SaveSite(){
 }
 
 
-func RenderTemplateToFile(tmpl, SiteRoot, save_file string, p interface{}){
+func (g *Globals) RenderTemplateToFile(tmpl, SiteRoot, save_file string, p interface{}){
     //we already parsed the html templates
     f, err := os.Create(path.Join(SiteRoot, save_file+".html"))
     if err != nil{
         log.Fatal("err opening file:", err)
     }
-    err = templates.ExecuteTemplate(f, tmpl+".html", p)
+    err = g.Templates.ExecuteTemplate(f, tmpl+".html", p)
     if err != nil {
         log.Fatal("err writing template to file", err)
     }

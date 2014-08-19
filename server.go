@@ -7,6 +7,7 @@ import (
     "os"
     "path"
     "io/ioutil"
+    "text/template"
     "github.com/howeyc/fsnotify"
 )
 
@@ -37,6 +38,8 @@ type Globals struct{
     Config ConfigType // config struct loaded from config.json
     SiteRoot string // path to the site
     webhookSecret []byte // secret key for authenticating github webhook requests
+
+    Templates  *template.Template
 
     Close chan bool // close server channel
 
@@ -100,6 +103,12 @@ func (g *Globals) serveFile(w http.ResponseWriter, r *http.Request){
         subs := strings.Split(r.URL.Path, ".")
         ext := subs[len(subs)-1]
         if ext == "png" || ext == "jpg" || ext == "pdf" {
+            p := path.Join(g.SiteRoot, r.URL.Path[1:])
+            _, err := os.Stat(p)
+            if err == nil{
+                http.ServeFile(w, r, p)
+            }
+        } else if ext == "js" || ext == "css"{
             p := path.Join(g.SiteRoot, r.URL.Path[1:])
             _, err := os.Stat(p)
             if err == nil{

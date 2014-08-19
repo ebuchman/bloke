@@ -14,6 +14,7 @@ import (
     "bytes"
     "regexp"
     "time"
+    "text/template"
 )
 
 // config struct - corresponds to config.json
@@ -105,8 +106,9 @@ func (g *Globals) LoadSecret(){
 // compile lists of pages and posts and prepare globals struct
 // require at least one page and one post!
 func (g *Globals) AssembleSite(){
+    // render templates
+    g.Templates = template.Must(template.ParseFiles(g.SiteRoot+"/views/page.html", g.SiteRoot+"/views/nav.html", g.SiteRoot+"/views/footer.html", g.SiteRoot+"/views/bubbles.html", g.SiteRoot+"/views/header.html"))
     // go through pages and posts and entries
-    //RenderTemplateToFile("page", "main", g)
     g.AssemblePages()
     g.AssemblePosts()
     g.LoadSecret()
@@ -359,6 +361,18 @@ func CreateNewSite(InitSite string){
         f.WriteString("}")
     }
     f.Close()
+
+    // copy over assets from bloke dir
+    cp := exec.Command("cp", "-r", path.Join(BlokePath, "assets"), path.Join(InitSite, "assets"))
+    err = cp.Run()
+    if err != nil{
+        log.Fatal("err: could not copy assets", err) 
+    }
+    cp = exec.Command("cp", "-r", path.Join(BlokePath, "views"), path.Join(InitSite, "views"))
+    err = cp.Run()
+    if err != nil{
+        log.Fatal("err: could not copy views", err) 
+    }
 
     _, err = os.Create(path.Join(InitSite, ".isbloke"))
     if err != nil{
