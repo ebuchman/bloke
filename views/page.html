@@ -10,6 +10,7 @@
  
     {{ if .Page.IsGlossary}}
     <body onload="load_all_bubbles();">
+        <p>fuck wit</p>
     {{ else }}
     <body>
     {{ end }}
@@ -24,7 +25,7 @@
           <h5>Recent Posts</h5>
           <ul>
               {{range $i, $n := .Globals.RecentPosts}}
-              <li><a href="{{index $n 1}}">{{index $n 0}}</a></li>
+              <li><a href="#/" onClick="get_post_data('{{index $n 1}}')">{{index $n 0}}</a></li>
               {{ end }}
           </ul>
       </div>

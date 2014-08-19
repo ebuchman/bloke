@@ -14,15 +14,8 @@ import (
     - Glossary/bubbles page
     - better home/blog definition
     - pdfs in bubbles?
-    - add tls redirects
     - clean up js bubbles so they follow user as they scroll
     - add "technical explanation" part to bubbles - + meta info?
-*/
-
-/*
-    Global variables
-        - Bloke path variable
-        - NewBubbleString
 */
 
 // bloke should be launched from the sites root
@@ -48,6 +41,9 @@ type Globals struct{
     Close chan bool // close server channel
 
     mux *http.ServeMux // when many blokes are run behind one serve, give each a routing mux (instead of standalone server)
+
+    html bool // whether to serve html pages from _sites/ or to generate on the fly
+    watch bool // whether to watch dir for changes
 }
 
 // new ServeMux. 
@@ -62,11 +58,17 @@ func (g *Globals) ServeHTTP(w http.ResponseWriter, r *http.Request){
 }
 
 // launch a new live bloke
-func LiveBloke(SitePath string) Globals{
+func LiveBloke(SitePath string, no_html bool) Globals{
     var g = Globals{}
+    g.html = !no_html // whether or not to serve html from _sites/
     g.LoadConfig(SitePath) // load config
     g.AssembleSite() // assemble site composition from dir contents
-    g.NewWatcher(SitePath) // watch the root directory
+    if g.html{
+        g.SaveSite()
+    }
+    if g.watch{
+        g.NewWatcher(SitePath) // watch the root directory
+    }
     g.NewServeMux() // creates g.mux and applies standard routing rules
     return g
 }
@@ -74,7 +76,7 @@ func LiveBloke(SitePath string) Globals{
 // create new globals, copy over (eg. after git pull)
 func (g *Globals) Refresh(){
     // TODO: close all old g things!
-    *g = LiveBloke(g.SiteRoot)
+    *g = LiveBloke(g.SiteRoot, g.html)
 }
 
 // serve static files (assets: js, css)
@@ -179,6 +181,7 @@ func ApplyRouting(mux *http.ServeMux, g *Globals){
     mux.HandleFunc("/assets/", serveBlokeFile) // static js, css files
     mux.HandleFunc("/bubbles/", g.ajaxBubbleResponse) // async bubbles
     mux.HandleFunc("/pages/", g.ajaxPagesResponse) // async page loads
+    mux.HandleFunc("/posts/", g.ajaxPagesResponse) // async post loads
     mux.HandleFunc("/git/", g.gitResponse) // github webhook
 }
 
@@ -215,8 +218,8 @@ func StartServer(addr string, mux *http.ServeMux, tls bool){
 }
 
 // standalone server for running your own bloke
-func StartBloke(addr, SiteRoot string, tls bool) {
-    g := LiveBloke(SiteRoot)
+func StartBloke(addr, SiteRoot string, tls bool, no_html bool) {
+    g := LiveBloke(SiteRoot, no_html)
     StartServer(addr, g.mux, tls)
 }
 

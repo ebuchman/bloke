@@ -55,7 +55,7 @@ func (g *Globals) errorPage(w http.ResponseWriter, err error){
 // load and parse a page and relevent metainfo 
 func (g *Globals) LoadPage(dirPath, name string, page *pageType) error{
     // read markdown file
-    log.Println(path.Join(dirPath, name+".md"))
+//    log.Println(path.Join(dirPath, name+".md"))
     b, err := ioutil.ReadFile(path.Join(dirPath,name+".md"))
     if err != nil{
         return err
@@ -72,9 +72,9 @@ func (g *Globals) LoadPage(dirPath, name string, page *pageType) error{
     page.Name = name
 
     //set flags
-    page.IsGlossary = g.Config.Glossary == page.Name
+    page.IsGlossary = page.Name == g.Config.Glossary ||  page.Name == "pages/"+g.Config.Glossary
+    log.Println(page.IsGlossary, page.Name)
     page.IsDisqus = g.Config.Disqus != ""
-    log.Println(page.IsGlossary)
 
     return nil
 }
@@ -128,10 +128,54 @@ func ParseBubbles(s []byte) string{
 }
 
 
+func (g *Globals) SaveSite(){
+    CheckFatal(os.MkdirAll(path.Join(g.SiteRoot, "_site"), 0777))
+    CheckFatal(os.MkdirAll(path.Join(g.SiteRoot, "_site", "pages"), 0777))
+    CheckFatal(os.MkdirAll(path.Join(g.SiteRoot, "_site", "posts"), 0777))
+
+    // generate project html files
+    for _, p := range g.Projects{
+        name := p[0]
+        if _, ok := g.SubProjects[name]; !ok{
+            page := new(pageType)
+            CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "pages"), name, page))
+            RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages"), name, viewType{page, g})
+        } else{
+            // deal with subprojects!
+            subprojs := g.SubProjects[name]
+            for _, sp := range subprojs{
+                sp_name := sp[0]
+                page := new(pageType)
+                CheckFatal(os.MkdirAll(path.Join(g.SiteRoot, "_site", "pages", name), 0777))
+                CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "pages", name), sp_name, page))
+                RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages", name), sp_name, viewType{page, g})
+            }
+
+        }
+
+    }
+
+    // generate post html files
+    for y, _ := range g.Posts{
+        for m, _ := range g.Posts[y]{
+            for d, _ := range g.Posts[y][m]{
+                for _, t := range g.Posts[y][m][d]{
+                    name := y+"-"+m+"-"+d+"-"+t
+                    page := new(pageType)
+                    CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "posts"), name, page)) 
+                    RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "posts"), name, viewType{page, g})
+                }
+            }
+        }
+    }
+
+
+}
+
 
 func RenderTemplateToFile(tmpl, SiteRoot, save_file string, p interface{}){
     //we already parsed the html templates
-    f, err := os.Create(SiteRoot+"/sites/"+save_file+".html")
+    f, err := os.Create(path.Join(SiteRoot, save_file+".html"))
     if err != nil{
         log.Fatal("err opening file:", err)
     }
@@ -139,6 +183,7 @@ func RenderTemplateToFile(tmpl, SiteRoot, save_file string, p interface{}){
     if err != nil {
         log.Fatal("err writing template to file", err)
     }
+    f.Close()
 }
 
 // it's a blog post if it is of the form yyyy-mm-dd-name-of-post.md and the date is quasi valid

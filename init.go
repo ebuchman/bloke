@@ -24,6 +24,7 @@ type ConfigType struct{
     Repo string `json:"github_repo"`
     Glossary string `json:"glossary_file"`
     Disqus string `json:"disqus_user"`
+    html bool
 }
 
 // load config struct from config.json
@@ -116,16 +117,27 @@ func (g *Globals) AssembleSite(){
 func (g *Globals) AssemblePosts(){
     // posts dir should be fill with files like 2014-06-12-Name.md
     // No directories
+    // posts are stored in map of map of map of list (y, m, d, title)
+    g.Posts = make(map[string]map[string]map[string][]string)
     files := ReadDir(path.Join(g.SiteRoot, "posts"))
     for _, f := range files {
         if !f.IsDir(){
            fname := strings.Split(f.Name(), ".")[0]
            date_name := strings.Split(fname, "-")
-           //year := date_name[0]
-           //month := date_name[1]
-           //day := date_name[2]
-           //TODO: robustify!
+           year := date_name[0]
+           month := date_name[1]
+           day := date_name[2]
            title := date_name[3]
+           if _, ok := g.Posts[year]; !ok{
+            g.Posts[year] = make(map[string]map[string][]string)
+           }
+           if _, ok := g.Posts[year][month]; !ok{
+            g.Posts[year][month] = make(map[string][]string)
+           }
+           if _, ok := g.Posts[year][month][day]; !ok{
+            g.Posts[year][month][day] = []string{}
+           }
+           g.Posts[year][month][day] = append(g.Posts[year][month][day], title)
            g.RecentPosts = append(g.RecentPosts, []string{title, fname})
         }
     }

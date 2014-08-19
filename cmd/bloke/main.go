@@ -20,6 +20,7 @@ func main(){
     var WebHook = flag.Bool("webhook", false, "create a new secret token for use with github webhook")
     var NewBubbles = flag.Bool("bubbles", false, "give all referenced bubbles a markdown file")
     var SSLEnable = flag.Bool("ssl", false, "enable ssl/tls (https)") 
+    var NoHTML = flag.Bool("nohtml", false, "serve html pages") 
 
     flag.Parse()
 
@@ -59,5 +60,5 @@ func main(){
         // run a server on 80 to redirect all traffic to 443
         go bloke.RedirectServer() 
     }
-    bloke.StartBloke(addr, SiteRoot, *SSLEnable)
+    bloke.StartBloke(addr, SiteRoot, *SSLEnable, *NoHTML)
 }

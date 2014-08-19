@@ -31,6 +31,7 @@ type viewType struct{
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
         log.Println("handle Index", r.URL.Path)
         log.Println("handle Index", r.Host)
+
         page := new(pageType)
         // is URL is empty, serve main page, else validate URL and LoadPage
         if len(r.URL.Path[1:]) > 0{
@@ -42,6 +43,10 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }
             //posts
             if IsPost(path_elements[0]){
+                if g.html{
+                   http.ServeFile(w, r, path.Join(g.SiteRoot, "_site", "posts", r.URL.Path[1:]+".html")) 
+                   return
+                }
                 err := g.LoadPage(path.Join(g.SiteRoot, "posts"), r.URL.Path[1:], page)
                 if err != nil{
                     g.errorPage(w, err)
@@ -49,6 +54,10 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
                 }
             //pages
             }else if g.IsPage(r.URL.Path[1:]){
+                if g.html{
+                   http.ServeFile(w, r, path.Join(g.SiteRoot, "_site", "pages", r.URL.Path[1:]+".html")) 
+                   return
+                }
                 err := g.LoadPage(path.Join(g.SiteRoot, "pages"), r.URL.Path[1:], page)
                 if err != nil{
                     g.errorPage(w, err)
@@ -60,6 +69,10 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }
         //home
         } else {
+            if g.html{
+               http.ServeFile(w, r, path.Join(g.SiteRoot, "_site", "posts", g.RecentPosts[0][1]+".html")) 
+               return
+            }
             err := g.LoadPage(path.Join(g.SiteRoot, "posts"), g.RecentPosts[0][1], page)
             if err != nil{
                 g.errorPage(w, err)
@@ -103,6 +116,8 @@ func (g *Globals) ajaxBubbleResponse(w http.ResponseWriter, r *http.Request){
         }
         for _, f := range files{
             name := f.Name()
+            split := strings.Split(name, ".")
+            name = split[0]
             bubble_content := LoadBubble(g.SiteRoot, path.Join("bubbles", name))
             response.Bubbles = append(response.Bubbles, Bubble{name, bubble_content})
         }

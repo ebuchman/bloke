@@ -52,6 +52,14 @@ function get_page_data(page){
     return false;
 }
 
+function get_post_data(page){
+    console.log(page);
+    xmlhttp = new_request_obj();
+    request_callback(xmlhttp, _get_page_data, [page]);
+    make_request(xmlhttp, "POST", "/posts/"+page, true, {"form":"load_content", "name":page});
+    return false;
+}
+
 function load_all_bubbles(){
     console.log("loadem up!");
     xmlhttp = new_request_obj();
@@ -108,9 +116,12 @@ function close_bubble(id){
 }
 
 // replace page
-function replace_page(name, content){
+function replace_page(name, content, isGlos){
     document.getElementById("main-title").innerHTML = name;
     document.getElementById("main-text").innerHTML = content;
+    if (isGlos){
+        load_all_bubbles();
+    }
 }
 
 // callback
@@ -124,14 +135,15 @@ function _get_entry_data(xmlhttp, name, inplace, pos){
 function _get_page_data(xmlhttp, pagename){
     var response = JSON.parse(xmlhttp.responseText);
     content = response.Text;
-    replace_page(response.Title, content);
+    isGlos = response.IsGlossary;
+    replace_page(response.Title, content, isGlos);
 }
 
 function _load_all_bubbles(xmlhttp){ 
 	var response = JSON.parse(xmlhttp.responseText);
     var bubbles = response.bubbles;
     for (var i=0 ; i < bubbles.length; i++){
-        new_bubble(bubbles[i].name, bubbles[i].content, 0)
+        new_bubble(bubbles[i].title, bubbles[i].content, 0)
     }
 }
 
