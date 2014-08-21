@@ -31,6 +31,12 @@ type ConfigType struct{
 // load config struct from config.json
 func (g * Globals) LoadConfig(SiteRoot string){
     g.SiteRoot = SiteRoot
+    log.Println("site root from config", g.SiteRoot)
+    wd, err := os.Getwd()
+    if err != nil{
+        log.Fatal("shit tits")
+    }
+    log.Println("working dir:", wd)
     file, e := ioutil.ReadFile(path.Join(g.SiteRoot, "config.json"))
     if e != nil{
         log.Fatal("no config", e)
@@ -38,8 +44,6 @@ func (g * Globals) LoadConfig(SiteRoot string){
     var c ConfigType
     json.Unmarshal(file, &c)
     g.Config = c
-
-    g.Close = make(chan bool)
 
     // sync with git repo first time
     if g.Config.Repo != ""{
@@ -102,12 +106,15 @@ func (g *Globals) LoadSecret(){
     g.webhookSecret = b
 }
 
+func GetTemplates(root string) *template.Template{
+    return template.Must(template.ParseFiles(root+"/views/page.html", root+"/views/nav.html", root+"/views/footer.html", root+"/views/bubbles.html", root+"/views/header.html"))
+}
 // main server startup function
 // compile lists of pages and posts and prepare globals struct
 // require at least one page and one post!
 func (g *Globals) AssembleSite(){
     // render templates
-    g.Templates = template.Must(template.ParseFiles(g.SiteRoot+"/views/page.html", g.SiteRoot+"/views/nav.html", g.SiteRoot+"/views/footer.html", g.SiteRoot+"/views/bubbles.html", g.SiteRoot+"/views/header.html"))
+    g.Templates = GetTemplates(g.SiteRoot)
     // go through pages and posts and entries
     g.AssemblePages()
     g.AssemblePosts()

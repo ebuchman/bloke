@@ -24,7 +24,10 @@ func main(){
 
     flag.Parse()
 
-    SiteRoot := "."
+    SiteRoot, err := os.Getwd()
+    if err !=nil{
+        log.Fatal("could not get site root", err)
+    }
     
     if *InitSite != ""{
         bloke.CreateNewSite(*InitSite)

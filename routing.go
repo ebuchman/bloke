@@ -15,8 +15,8 @@ import (
 
 // this guy gets passed to the go templates. simply has pointers to the globals and the page
 // every request sees the same globals, but a different page
-type viewType struct{
-    Page *pageType
+type ViewType struct{
+    Page *PageType
     Globals *Globals
 }
 
@@ -29,10 +29,9 @@ type viewType struct{
             /ProjectName/SubProjectName         a particular subproject page
 */ 
 func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
-        log.Println("handle Index", r.URL.Path)
-        log.Println("handle Index", r.Host)
+        log.Println("handle Index", r.URL.Path, r.Host)
 
-        page := new(pageType)
+        page := new(PageType)
         // is URL is empty, serve main page, else validate URL and LoadPage
         if len(r.URL.Path[1:]) > 0{
             path_elements := strings.Split(r.URL.Path[1:], "/")
@@ -79,7 +78,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
                 return 
             }
         }
-        g.renderTemplate(w, "page", viewType{Page:page, Globals:g})
+        g.RenderTemplate(w, "page", ViewType{Page:page, Globals:g})
 }
 
 type Bubble struct{
@@ -131,8 +130,8 @@ func (g *Globals) ajaxBubbleResponse(w http.ResponseWriter, r *http.Request){
 
 func (g *Globals) ajaxPagesResponse(w http.ResponseWriter, r *http.Request){
     split := strings.Split(r.URL.Path[1:], "/")
-    log.Println(split)
-    page := new(pageType)
+    log.Println("shit son", split)
+    page := new(PageType)
     if len(split) > 1 && split[1] != ""{
         err := g.LoadPage(g.SiteRoot, r.URL.Path[1:], page)
         if err != nil{

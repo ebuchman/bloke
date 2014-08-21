@@ -19,7 +19,7 @@ type MetaInfoType struct {
 }
 
 // info specific to the page requested by a client
-type pageType struct{
+type PageType struct{
     Name string //URL name of this page
     Text string // text of current page
     Title string // title of current page
@@ -32,7 +32,7 @@ type pageType struct{
 
 
 // bring a template to life!
-func (g *Globals) renderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
+func (g *Globals) RenderTemplate(w http.ResponseWriter, tmpl string, p interface{}){
     //we already parsed the html templates
     err := g.Templates.ExecuteTemplate(w, tmpl+".html", p)
     if err != nil {
@@ -42,14 +42,14 @@ func (g *Globals) renderTemplate(w http.ResponseWriter, tmpl string, p interface
 
 // error function
 func (g *Globals) errorPage(w http.ResponseWriter, err error){
-    page := new(pageType)
+    page := new(PageType)
     page.Title = "Error"
     page.Text = err.Error()
-    g.renderTemplate(w, "page", viewType{Page: page, Globals: g})
+    g.RenderTemplate(w, "page", ViewType{Page: page, Globals: g})
 }
 
 // load and parse a page and relevent metainfo 
-func (g *Globals) LoadPage(dirPath, name string, page *pageType) error{
+func (g *Globals) LoadPage(dirPath, name string, page *PageType) error{
     // read markdown file
 //    log.Println(path.Join(dirPath, name+".md"))
     b, err := ioutil.ReadFile(path.Join(dirPath,name+".md"))
@@ -133,18 +133,18 @@ func (g *Globals) SaveSite(){
     for _, p := range g.Projects{
         name := p[0]
         if _, ok := g.SubProjects[name]; !ok{
-            page := new(pageType)
+            page := new(PageType)
             CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "pages"), name, page))
-            g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages"), name, viewType{page, g})
+            g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages"), name, ViewType{page, g})
         } else{
             // deal with subprojects!
             subprojs := g.SubProjects[name]
             for _, sp := range subprojs{
                 sp_name := sp[0]
-                page := new(pageType)
+                page := new(PageType)
                 CheckFatal(os.MkdirAll(path.Join(g.SiteRoot, "_site", "pages", name), 0777))
                 CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "pages", name), sp_name, page))
-                g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages", name), sp_name, viewType{page, g})
+                g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "pages", name), sp_name, ViewType{page, g})
             }
 
         }
@@ -157,9 +157,9 @@ func (g *Globals) SaveSite(){
             for d, _ := range g.Posts[y][m]{
                 for _, t := range g.Posts[y][m][d]{
                     name := y+"-"+m+"-"+d+"-"+t
-                    page := new(pageType)
+                    page := new(PageType)
                     CheckFatal(g.LoadPage(path.Join(g.SiteRoot, "posts"), name, page)) 
-                    g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "posts"), name, viewType{page, g})
+                    g.RenderTemplateToFile("page", path.Join(g.SiteRoot, "_site", "posts"), name, ViewType{page, g})
                 }
             }
         }

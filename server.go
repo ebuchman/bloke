@@ -12,7 +12,7 @@ import (
 )
 
 /* TODO
-    - Glossary/bubbles page
+    - bubbles only display one line!
     - better home/blog definition
     - pdfs in bubbles?
     - clean up js bubbles so they follow user as they scroll
@@ -41,12 +41,33 @@ type Globals struct{
 
     Templates  *template.Template
 
-    Close chan bool // close server channel
-
     mux *http.ServeMux // when many blokes are run behind one serve, give each a routing mux (instead of standalone server)
+
+    UpdateHandler UpdateHandler // called with names of updated bubbles 
 
     html bool // whether to serve html pages from _sites/ or to generate on the fly
     watch bool // whether to watch dir for changes
+}
+
+// for handling bubble updates
+// this can be ignored, if the updates are in text files being served
+// it can trigger database lookups/modifications
+// it can do whatever else you want
+// point is, separate bloke site generator from the bupble database
+type UpdateHandler interface{
+    // takes a list of the names of the updated bubbles
+    HandleUpdate(map[string]int) 
+}
+
+// not even using this. is bloke is running as a simple site generator, no one cares, this is nil
+// if bloke is being hosted, you probably want to implement an UpdateHandler to talk to the db
+type baseUpdateHandler struct{
+
+}
+
+func (b baseUpdateHandler) HandleUpdate(updates map[string]int){
+    log.Println("booya nigga")
+    log.Println(updates)
 }
 
 // new ServeMux. 
@@ -61,7 +82,7 @@ func (g *Globals) ServeHTTP(w http.ResponseWriter, r *http.Request){
 }
 
 // launch a new live bloke
-func LiveBloke(SitePath string, no_html bool) Globals{
+func LiveBloke(SitePath string, no_html bool, update_handler UpdateHandler) Globals{
     var g = Globals{}
     g.html = !no_html // whether or not to serve html from _sites/
     g.LoadConfig(SitePath) // load config
@@ -72,14 +93,26 @@ func LiveBloke(SitePath string, no_html bool) Globals{
     if g.watch{
         g.NewWatcher(SitePath) // watch the root directory
     }
+    g.UpdateHandler = update_handler//baseUpdateHandler{}
     g.NewServeMux() // creates g.mux and applies standard routing rules
     return g
 }
 
 // create new globals, copy over (eg. after git pull)
-func (g *Globals) Refresh(){
+// takes a list of bubble names recently updates
+func (g *Globals) Refresh(updates map[string]int){
+    // if nil, its coming from local watchdir callback, which is experimental 
+    // and kind of shitty
+
     // TODO: close all old g things!
-    *g = LiveBloke(g.SiteRoot, g.html)
+
+    // if a bubble is updated, we need to know!
+    log.Println(g.Config.SiteName, g.UpdateHandler)
+    if g.UpdateHandler != nil{
+        g.UpdateHandler.HandleUpdate(updates)
+    }
+
+    *g = LiveBloke(g.SiteRoot, g.html, g.UpdateHandler)
 }
 
 // serve static files (assets: js, css)
@@ -140,7 +173,7 @@ func (g *Globals) WatchDirCallback(watcher *fsnotify.Watcher){
                 split := strings.Split(ev.Name, "/")
                 name := split[len(split)-1]
                 if !strings.HasPrefix(name, ".") && !strings.HasSuffix(name, "~"){
-                    g.Refresh()            
+                    g.Refresh(nil)            
                 }
             }
         case err := <-watcher.Error:
@@ -209,6 +242,7 @@ func RedirectServer(){
 
 // start a http or https server listening on addr routing with the mux
 func StartServer(addr string, mux *http.ServeMux, tls bool){
+    log.Println("wtf!")
     if tls{
         _, err := ioutil.ReadDir("certs")
         if err != nil{
@@ -228,7 +262,7 @@ func StartServer(addr string, mux *http.ServeMux, tls bool){
 
 // standalone server for running your own bloke
 func StartBloke(addr, SiteRoot string, tls bool, no_html bool) {
-    g := LiveBloke(SiteRoot, no_html)
+    g := LiveBloke(SiteRoot, no_html, nil)
     StartServer(addr, g.mux, tls)
 }
 
