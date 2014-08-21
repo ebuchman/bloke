@@ -41,7 +41,7 @@ func (g *Globals) RenderTemplate(w http.ResponseWriter, tmpl string, p interface
 }
 
 // error function
-func (g *Globals) errorPage(w http.ResponseWriter, err error){
+func (g *Globals) ErrorPage(w http.ResponseWriter, err error){
     page := new(PageType)
     page.Title = "Error"
     page.Text = err.Error()

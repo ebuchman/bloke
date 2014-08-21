@@ -70,10 +70,21 @@ func (b baseUpdateHandler) HandleUpdate(updates map[string]int){
     log.Println(updates)
 }
 
+type Router interface{
+    ApplyRouting(*http.ServeMux, *Globals)
+}
+
+type baseRouter struct{
+
+}
+
 // new ServeMux. 
-func (g *Globals) NewServeMux(){
+func (g *Globals) NewServeMux(r Router){
     g.mux = http.NewServeMux()
-    ApplyRouting(g.mux, g)
+    if r == nil{
+        r = baseRouter{}
+    }
+    r.ApplyRouting(g.mux, g)
 }
 
 // serve over the mux
@@ -94,7 +105,7 @@ func LiveBloke(SitePath string, no_html bool, update_handler UpdateHandler) Glob
         g.NewWatcher(SitePath) // watch the root directory
     }
     g.UpdateHandler = update_handler//baseUpdateHandler{}
-    g.NewServeMux() // creates g.mux and applies standard routing rules
+    g.NewServeMux(nil) // creates g.mux and applies standard routing rules
     return g
 }
 
@@ -116,12 +127,12 @@ func (g *Globals) Refresh(updates map[string]int){
 }
 
 // serve static files (assets: js, css)
-func serveBlokeFile(w http.ResponseWriter, r *http.Request){
+func (g *Globals) ServeBlokeFile(w http.ResponseWriter, r *http.Request){
     if strings.Contains(r.URL.Path, "."){
         subs := strings.Split(r.URL.Path, ".")
         ext := subs[len(subs)-1]
         if ext == "js" || ext == "css"{
-            p := path.Join(BlokePath, r.URL.Path[1:])
+            p := path.Join(g.SiteRoot, r.URL.Path[1:])
             _, err := os.Stat(p)
             if err == nil{
                 http.ServeFile(w, r, p)
@@ -131,7 +142,7 @@ func serveBlokeFile(w http.ResponseWriter, r *http.Request){
 }
 
 // serve static files (imgs, files)
-func (g *Globals) serveFile(w http.ResponseWriter, r *http.Request){
+func (g *Globals) ServeFile(w http.ResponseWriter, r *http.Request){
     if strings.Contains(r.URL.Path, "."){
         subs := strings.Split(r.URL.Path, ".")
         ext := subs[len(subs)-1]
@@ -216,11 +227,11 @@ func (g *Globals) NewWatcher(SiteRoot string){
 }
 
 // apply a set of routing rules to a mux using a bloke globals struct
-func ApplyRouting(mux *http.ServeMux, g *Globals){
+func (r baseRouter) ApplyRouting(mux *http.ServeMux, g *Globals){
     mux.HandleFunc("/", g.handleIndex) // main page (/, /postname, /pagename)
-    mux.HandleFunc("/imgs/", g.serveFile) // static images (png, jpg)
-    mux.HandleFunc("/files/", g.serveFile) // static documents (pdfs)
-    mux.HandleFunc("/assets/", serveBlokeFile) // static js, css files
+    mux.HandleFunc("/imgs/", g.ServeFile) // static images (png, jpg)
+    mux.HandleFunc("/files/", g.ServeFile) // static documents (pdfs)
+    mux.HandleFunc("/assets/", g.ServeBlokeFile) // static js, css files
     mux.HandleFunc("/bubbles/", g.ajaxBubbleResponse) // async bubbles
     mux.HandleFunc("/pages/", g.ajaxPagesResponse) // async page loads
     mux.HandleFunc("/posts/", g.ajaxPagesResponse) // async post loads

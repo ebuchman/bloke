@@ -37,7 +37,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             path_elements := strings.Split(r.URL.Path[1:], "/")
             // currently, a URL can only have 2 parts (ie. if its a subproject)
             if len(path_elements) > 2{
-                g.errorPage(w, errors.New("Invalid URL"))
+                g.ErrorPage(w, errors.New("Invalid URL"))
                 return
             }
             //posts
@@ -48,7 +48,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
                 }
                 err := g.LoadPage(path.Join(g.SiteRoot, "posts"), r.URL.Path[1:], page)
                 if err != nil{
-                    g.errorPage(w, err)
+                    g.ErrorPage(w, err)
                     return
                 }
             //pages
@@ -59,11 +59,11 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
                 }
                 err := g.LoadPage(path.Join(g.SiteRoot, "pages"), r.URL.Path[1:], page)
                 if err != nil{
-                    g.errorPage(w, err)
+                    g.ErrorPage(w, err)
                     return 
                 }
             } else{
-                g.errorPage(w, errors.New("Invalid URL"))
+                g.ErrorPage(w, errors.New("Invalid URL"))
                 return
             }
         //home
@@ -74,7 +74,7 @@ func (g *Globals) handleIndex(w http.ResponseWriter, r *http.Request){
             }
             err := g.LoadPage(path.Join(g.SiteRoot, "posts"), g.RecentPosts[0][1], page)
             if err != nil{
-                g.errorPage(w, err)
+                g.ErrorPage(w, err)
                 return 
             }
         }
