@@ -9,7 +9,7 @@ Bloke
 
 What is this?
 ---
-Bloke is everything you wanted from a blog and more. With a built in server and AJAX functionality, a bloke gives you blog posts, project pages, and dynamic wiki-bubbles, all generated on the fly from simple markdown files. Use the wiki-bubbles to document important terms, or to build up collosal glossaries. Easily monitor and manage content and contributions with github integration. Connect with millions of internet communities through the Disqus commenting plugin. Bloke's open-source and written in Go (wtih some javascript), so it's fast, easy to install/configure/run, and open to contributions and improvements from anyone!
+Bloke is everything you wanted from a blog and more. With a built in server and AJAX functionality, a bloke gives you blog posts, project pages, and dynamic wiki-bubbles, all generated on the fly from simple markdown files. Use the wiki-bubbles to document important terms, or to build up colossal glossaries. Easily monitor and manage content and contributions with github integration. Connect with millions of internet communities through the Disqus commenting plugin. Bloke's open-source and written in Go (wtih some javascript), so it's fast, easy to install/configure/run, and open to contributions and improvements from anyone!
 
 If you like, Bloke can stand for `Bubbles, Love, and Open Knowledge Everywhere`. But really it's just a better blog ;)
 
